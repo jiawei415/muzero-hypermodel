@@ -94,6 +94,8 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         super().__init__()
         self.action_space_size = action_space_size
         self.full_support_size = 2 * support_size + 1
+        self.encoding_size = encoding_size
+        self.value_hidden = fc_value_layers[0]
 
         self.representation_network = torch.nn.DataParallel(
             mlp(
@@ -124,10 +126,26 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         self.prediction_value_network = torch.nn.DataParallel(
             mlp(encoding_size, fc_value_layers, self.full_support_size)
         )
+        weight_inp_dim = 32
+        weight_out_dim = (self.encoding_size + 1) * self.value_hidden + (self.value_hidden + 1) * self.full_support_size
+        self.weights = torch.nn.Linear(weight_inp_dim, weight_out_dim )
 
-    def prediction(self, encoded_state):
+    def prediction(self, encoded_state, noise_z=None):
+        # noise_z = torch.Tensor(encoded_state.shape[0], 32)
+        # print(f'noise_z: {noise_z.shape}')
+        weights = self.weights(noise_z)
+        w1, b1, w2, b2 = weights.split([self.encoding_size*self.value_hidden, self.value_hidden, self.value_hidden*self.full_support_size, self.full_support_size], dim=1)
+        w1 = w1.view(-1, self.encoding_size, self.value_hidden)
+        b1 = b1.view(-1, 1, self.value_hidden)
+        w2 = w2.view(-1, self.value_hidden, self.full_support_size)
+        b2 = b2.view(-1, 1, self.full_support_size)
+        inp = encoded_state.view(-1, 1, self.encoding_size)
+        out = torch.bmm((torch.bmm(inp, w1) + b1), w2) + b2
+        value = out.squeeze(dim=1)
+
+
         policy_logits = self.prediction_policy_network(encoded_state)
-        value = self.prediction_value_network(encoded_state)
+        # value = self.prediction_value_network(encoded_state)
         return policy_logits, value
 
     def representation(self, observation):
@@ -169,9 +187,9 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
 
         return next_encoded_state_normalized, reward
 
-    def initial_inference(self, observation):
+    def initial_inference(self, observation, noise_z):
         encoded_state = self.representation(observation)
-        policy_logits, value = self.prediction(encoded_state)
+        policy_logits, value = self.prediction(encoded_state, noise_z)
         # reward equal to 0 for consistency
         reward = torch.log(
             (
@@ -189,9 +207,9 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             encoded_state,
         )
 
-    def recurrent_inference(self, encoded_state, action):
+    def recurrent_inference(self, encoded_state, action, noise_z):
         next_encoded_state, reward = self.dynamics(encoded_state, action)
-        policy_logits, value = self.prediction(next_encoded_state)
+        policy_logits, value = self.prediction(next_encoded_state, noise_z)
         return value, reward, policy_logits, next_encoded_state
 
 

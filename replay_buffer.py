@@ -346,8 +346,9 @@ class Reanalyse:
                     .float()
                     .to(next(self.model.parameters()).device)
                 )
+                noise_z = torch.normal(0, 1, size=(observations.shape[0], 32)).float().to(next(self.model.parameters()).device)
                 values = models.support_to_scalar(
-                    self.model.initial_inference(observations)[0],
+                    self.model.initial_inference(observations, noise_z)[0],
                     self.config.support_size,
                 )
                 game_history.reanalysed_predicted_root_values = (

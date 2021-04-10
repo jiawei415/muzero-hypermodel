@@ -113,6 +113,7 @@ class SelfPlay:
         """
         Play one game with actions based on the Monte Carlo tree search at each moves.
         """
+        noise_z = numpy.random.normal(0,1,[1,32])
         game_history = GameHistory()
         observation = self.game.reset()
         game_history.action_history.append(0)
@@ -143,6 +144,7 @@ class SelfPlay:
                 # Choose the action
                 if opponent == "self" or muzero_player == self.game.to_play():
                     root, mcts_info = MCTS(self.config).run(
+                        noise_z,
                         self.model,
                         stacked_observations,
                         self.game.legal_actions(),
@@ -260,6 +262,7 @@ class MCTS:
 
     def run(
         self,
+        noise_z,
         model,
         observation,
         legal_actions,
@@ -289,7 +292,7 @@ class MCTS:
                 reward,
                 policy_logits,
                 hidden_state,
-            ) = model.initial_inference(observation)
+            ) = model.initial_inference(observation, torch.tensor(noise_z, dtype=torch.float))
             root_predicted_value = models.support_to_scalar(
                 root_predicted_value, self.config.support_size
             ).item()
@@ -340,6 +343,7 @@ class MCTS:
             value, reward, policy_logits, hidden_state = model.recurrent_inference(
                 parent.hidden_state,
                 torch.tensor([[action]]).to(parent.hidden_state.device),
+                torch.tensor(noise_z, dtype=torch.float)
             )
             value = models.support_to_scalar(value, self.config.support_size).item()
             reward = models.support_to_scalar(reward, self.config.support_size).item()

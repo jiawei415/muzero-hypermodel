@@ -149,6 +149,7 @@ class Trainer:
         target_reward = torch.tensor(target_reward).float().to(device)
         target_policy = torch.tensor(target_policy).float().to(device)
         gradient_scale_batch = torch.tensor(gradient_scale_batch).float().to(device)
+        batch_noise_z = torch.normal(0, 1, size=(observation_batch.shape[0], 32)).float().to(device)
         # observation_batch: batch, channels, height, width
         # action_batch: batch, num_unroll_steps+1, 1 (unsqueeze)
         # target_value: batch, num_unroll_steps+1
@@ -165,12 +166,12 @@ class Trainer:
 
         ## Generate predictions
         value, reward, policy_logits, hidden_state = self.model.initial_inference(
-            observation_batch
+            observation_batch, batch_noise_z
         )
         predictions = [(value, reward, policy_logits)]
         for i in range(1, action_batch.shape[1]):
             value, reward, policy_logits, hidden_state = self.model.recurrent_inference(
-                hidden_state, action_batch[:, i]
+                hidden_state, action_batch[:, i], batch_noise_z
             )
             # Scale the gradient at the start of the dynamics function (See paper appendix Training)
             hidden_state.register_hook(lambda grad: grad * 0.5)
