@@ -116,6 +116,7 @@ class SelfPlay:
         noise_z = numpy.random.normal(0,1,[1,32])
         game_history = GameHistory()
         observation = self.game.reset()
+        game_history.noise_history = noise_z
         game_history.action_history.append(0)
         game_history.observation_history.append(observation)
         game_history.reward_history.append(0)
@@ -487,6 +488,7 @@ class GameHistory:
     """
 
     def __init__(self):
+        self.noise_history = None
         self.observation_history = []
         self.action_history = []
         self.reward_history = []

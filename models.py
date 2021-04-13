@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 
 import torch
 
-
 class MuZeroNetwork:
     def __new__(cls, config):
         if config.network == "fullyconnected":
@@ -140,7 +139,8 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         w2 = w2.view(-1, self.value_hidden, self.full_support_size)
         b2 = b2.view(-1, 1, self.full_support_size)
         inp = encoded_state.view(-1, 1, self.encoding_size)
-        out = torch.bmm((torch.bmm(inp, w1) + b1), w2) + b2 # TODO relu
+        hidden = torch.nn.functional.relu(torch.bmm(inp, w1) + b1)
+        out = torch.bmm(hidden, w2) + b2
         value = out.squeeze(dim=1)
 
         policy_logits = self.prediction_policy_network(encoded_state)
