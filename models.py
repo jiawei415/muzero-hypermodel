@@ -128,7 +128,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         )
         weight_inp_dim = 32
         weight_out_dim = (self.encoding_size + 1) * self.value_hidden + (self.value_hidden + 1) * self.full_support_size
-        self.weights = torch.nn.Linear(weight_inp_dim, weight_out_dim )
+        self.weights = torch.nn.Linear(weight_inp_dim, weight_out_dim)
 
     def prediction(self, encoded_state, noise_z=None):
         # noise_z = torch.Tensor(encoded_state.shape[0], 32)
@@ -140,9 +140,8 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         w2 = w2.view(-1, self.value_hidden, self.full_support_size)
         b2 = b2.view(-1, 1, self.full_support_size)
         inp = encoded_state.view(-1, 1, self.encoding_size)
-        out = torch.bmm((torch.bmm(inp, w1) + b1), w2) + b2
+        out = torch.bmm((torch.bmm(inp, w1) + b1), w2) + b2 # TODO relu
         value = out.squeeze(dim=1)
-
 
         policy_logits = self.prediction_policy_network(encoded_state)
         # value = self.prediction_value_network(encoded_state)
