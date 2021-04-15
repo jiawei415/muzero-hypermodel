@@ -2,6 +2,7 @@ import datetime
 import os
 
 import gym
+import math
 import numpy
 import torch
 
@@ -50,7 +51,7 @@ class MuZeroConfig:
         ### Network
         self.network = "fullyconnected"  # "resnet" / "fullyconnected"
         self.support_size = 10  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size. Choose it so that support_size <= sqrt(max(abs(discounted reward)))
-        
+
         # Residual Network
         self.downsample = False  # Downsample observations before representation network, False / "CNN" (lighter) / "resnet" (See paper appendix Network Architecture)
         self.blocks = 1  # Number of blocks in the ResNet
@@ -136,27 +137,35 @@ class Game(AbstractGame):
         self.env = gym.make("CartPole-v1")
         if seed is not None:
             self.env.seed(seed)
+        self.reward_theta = 1 * 2 * math.pi / 360
 
     def step(self, action):
         """
         Apply action to the game.
-        
+
         Args:
             action : action of the action_space to take.
 
         Returns:
             The new observation, the reward and a boolean if the game has ended.
         """
-        observation, reward, done, _ = self.env.step(action)
+        observation, _, done, _ = self.env.step(action)
+        x, x_dot, theta, theta_dot = observation
+        if (-self.reward_theta < theta < self.reward_theta) and (-self.env.x_threshold < x < self.env.x_threshold):
+            reward = 1
+        else:
+            reward = 0
+        print(f"obs: {observation}")
+        print(f"rwd: {reward}")
         return numpy.array([[observation]]), reward, done
 
     def legal_actions(self):
         """
         Should return the legal actions at each turn, if it is not available, it can return
         the whole action space. At each turn, the game have to be able to handle one of returned actions.
-        
+
         For complex game where calculating legal moves is too long, the idea is to define the legal actions
-        equal to the action space but to return a negative reward if the action is illegal.        
+        equal to the action space but to return a negative reward if the action is illegal.
 
         Returns:
             An array of integers, subset of the action space.
@@ -166,7 +175,7 @@ class Game(AbstractGame):
     def reset(self):
         """
         Reset the game for a new game.
-        
+
         Returns:
             Initial observation of the game.
         """
