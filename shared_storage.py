@@ -1,11 +1,8 @@
 import copy
 import os
-
-import ray
 import torch
 
 
-@ray.remote
 class SharedStorage:
     """
     Class which run in a dedicated thread to store the network weights and some information.
@@ -18,7 +15,6 @@ class SharedStorage:
     def save_checkpoint(self, path=None):
         if not path:
             path = os.path.join(self.config.results_path, "model.checkpoint")
-
         torch.save(self.current_checkpoint, path)
 
     def get_checkpoint(self):

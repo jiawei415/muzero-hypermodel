@@ -19,6 +19,7 @@ class MuZeroConfig:
 
 
         ### Game
+        self.hard = False
         self.observation_shape = (1, 1, 4)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
         self.action_space = list(range(2))  # Fixed list of all possible actions. You should only edit the length
         self.players = list(range(1))  # List of players. You should only edit the length
@@ -101,7 +102,7 @@ class MuZeroConfig:
         self.PER_alpha = 0.5  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
 
         # Reanalyze (See paper appendix Reanalyse)
-        self.use_last_model_value = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
+        self.use_last_model_value = False  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
         self.reanalyse_on_gpu = False
 
 
@@ -133,11 +134,12 @@ class Game(AbstractGame):
     Game wrapper.
     """
 
-    def __init__(self, seed=None):
+    def __init__(self, seed=None, hard=False):
         self.env = gym.make("CartPole-v1")
         if seed is not None:
             self.env.seed(seed)
         self.reward_theta = 1 * 2 * math.pi / 360
+        self.hard = hard
 
     def step(self, action):
         """
@@ -149,14 +151,14 @@ class Game(AbstractGame):
         Returns:
             The new observation, the reward and a boolean if the game has ended.
         """
-        observation, _, done, _ = self.env.step(action)
-        x, x_dot, theta, theta_dot = observation
-        if (-self.reward_theta < theta < self.reward_theta) and (-self.env.x_threshold < x < self.env.x_threshold):
-            reward = 1
-        else:
-            reward = 0
-        print(f"obs: {observation}")
-        print(f"rwd: {reward}")
+        observation, reward, done, _ = self.env.step(action)
+        if self.hard:
+            x, x_dot, theta, theta_dot = observation
+            if (-self.reward_theta < theta < self.reward_theta) and (-self.env.x_threshold < x < self.env.x_threshold):
+                reward = 1
+            else:
+                reward = 0
+        
         return numpy.array([[observation]]), reward, done
 
     def legal_actions(self):
