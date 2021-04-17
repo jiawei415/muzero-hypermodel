@@ -16,8 +16,6 @@ class MuZeroConfig:
         self.seed = 0  # Seed for numpy, torch and the game
         self.max_num_gpus = None  # Fix the maximum number of GPUs to use. It's usually faster to use a single GPU (set it to 1) if it has enough memory. None will use every GPUs available
 
-
-
         ### Game
         self.hard = False
         self.observation_shape = (1, 1, 4)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
@@ -28,8 +26,6 @@ class MuZeroConfig:
         # Evaluate
         self.muzero_player = 0  # Turn Muzero begins to play (0: MuZero plays first, 1: MuZero plays second)
         self.opponent = None  # Hard coded agent that MuZero faces to assess his progress in multiplayer games. It doesn't influence training. None, "random" or "expert" if implemented in the Game class
-
-
 
         ### Self-Play
         self.num_workers = 1  # Number of simultaneous threads/workers self-playing to feed the replay buffer
@@ -46,8 +42,6 @@ class MuZeroConfig:
         # UCB formula
         self.pb_c_base = 19652
         self.pb_c_init = 1.25
-
-
 
         ### Network
         self.network = "fullyconnected"  # "resnet" / "fullyconnected"
@@ -72,8 +66,6 @@ class MuZeroConfig:
         self.fc_value_layers = [16]  # Define the hidden layers in the value network
         self.fc_policy_layers = [16]  # Define the hidden layers in the policy network
 
-
-
         ### Training
         self.results_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../results", os.path.basename(__file__)[:-3], datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S"))  # Path to store the model weights and TensorBoard logs
         self.save_model = True  # Save the checkpoint in results_path as model.checkpoint
@@ -92,8 +84,6 @@ class MuZeroConfig:
         self.lr_decay_rate = 0.9  # Set it to 1 to use a constant learning rate
         self.lr_decay_steps = 1000
 
-
-
         ### Replay Buffer
         self.replay_buffer_size = 500  # Number of self-play games to keep in the replay buffer
         self.num_unroll_steps = 10  # Number of game moves to keep for every batch element
@@ -104,8 +94,6 @@ class MuZeroConfig:
         # Reanalyze (See paper appendix Reanalyse)
         self.use_last_model_value = False  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
         self.reanalyse_on_gpu = False
-
-
 
         ### Adjust the self play / training ratio to avoid over/underfitting
         self.self_play_delay = 0  # Number of seconds to wait after each played game
@@ -157,8 +145,7 @@ class Game(AbstractGame):
             if (-self.reward_theta < theta < self.reward_theta) and (-self.env.x_threshold < x < self.env.x_threshold):
                 reward = 1
             else:
-                reward = 0
-        
+                reward = 0     
         return numpy.array([[observation]]), reward, done
 
     def legal_actions(self):
