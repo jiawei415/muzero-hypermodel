@@ -402,6 +402,7 @@ class CPUActor:
 
     def get_initial_weights(self, config):
         model = models.MuZeroNetwork(config)
+        print("\n", model)
         weigths = model.get_weights()
         summary = str(model).replace("\n", " \n\n")
         return weigths, summary

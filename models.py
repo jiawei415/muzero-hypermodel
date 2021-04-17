@@ -6,6 +6,10 @@ import torch
 
 class MuZeroNetwork:
     def __new__(cls, config):
+        if hasattr(config, 'hypermodel'):
+            hypermodel = config.hypermodel
+        else:
+            hypermodel = None
         if config.network == "fullyconnected":
             return MuZeroFullyConnectedNetwork(
                 config.observation_shape,
@@ -18,6 +22,7 @@ class MuZeroNetwork:
                 config.fc_representation_layers,
                 config.fc_dynamics_layers,
                 config.support_size,
+                hypermodel,
             )
         elif config.network == "resnet":
             return MuZeroResidualNetwork(
@@ -90,6 +95,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         fc_representation_layers,
         fc_dynamics_layers,
         support_size,
+        hypermodel,
     ):
         super().__init__()
         self.action_space_size = action_space_size
@@ -121,13 +127,35 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         self.prediction_policy_network = torch.nn.DataParallel(
             mlp(encoding_size, fc_policy_layers, self.action_space_size)
         )
-        self.prediction_value_network = torch.nn.DataParallel(
-            mlp(encoding_size, fc_value_layers, self.full_support_size)
-        )
 
-    def prediction(self, encoded_state):
+        self.hypermodel = hypermodel
+        if self.hypermodel:
+            self.encoding_size = encoding_size
+            self.value_hidden = fc_value_layers[0]
+            weight_inp_dim = 32
+            weight_out_dim = (self.encoding_size + 1) * self.value_hidden + (self.value_hidden + 1) * self.full_support_size
+            self.value_weights = torch.nn.Linear(weight_inp_dim, weight_out_dim)
+        else:
+            self.prediction_value_network = torch.nn.DataParallel(
+                mlp(encoding_size, fc_value_layers, self.full_support_size)
+            )
+
+    def prediction(self, encoded_state, noise_z):
         policy_logits = self.prediction_policy_network(encoded_state)
-        value = self.prediction_value_network(encoded_state)
+        if self.hypermodel:
+            value_weights = self.value_weights(noise_z)
+            w1, b1, w2, b2 = value_weights.split([self.encoding_size*self.value_hidden, self.value_hidden, self.value_hidden*self.full_support_size, self.full_support_size], dim=1)
+            w1 = w1.view(-1, self.encoding_size, self.value_hidden)
+            b1 = b1.view(-1, 1, self.value_hidden)
+            w2 = w2.view(-1, self.value_hidden, self.full_support_size)
+            b2 = b2.view(-1, 1, self.full_support_size)
+            inp = encoded_state.view(-1, 1, self.encoding_size)
+            hidden = torch.nn.functional.relu(torch.bmm(inp, w1) + b1)
+            out = torch.bmm(hidden, w2) + b2
+            value = out.squeeze(dim=1)
+        else:
+            value = self.prediction_value_network(encoded_state)
+
         return policy_logits, value
 
     def representation(self, observation):
@@ -169,9 +197,9 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
 
         return next_encoded_state_normalized, reward
 
-    def initial_inference(self, observation):
+    def initial_inference(self, observation, noise_z):
         encoded_state = self.representation(observation)
-        policy_logits, value = self.prediction(encoded_state)
+        policy_logits, value = self.prediction(encoded_state, noise_z)
         # reward equal to 0 for consistency
         reward = torch.log(
             (
@@ -186,12 +214,13 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             value,
             reward,
             policy_logits,
+
             encoded_state,
         )
 
-    def recurrent_inference(self, encoded_state, action):
+    def recurrent_inference(self, encoded_state, action, noise_z):
         next_encoded_state, reward = self.dynamics(encoded_state, action)
-        policy_logits, value = self.prediction(next_encoded_state)
+        policy_logits, value = self.prediction(next_encoded_state, noise_z)
         return value, reward, policy_logits, next_encoded_state
 
 
@@ -594,7 +623,7 @@ class MuZeroResidualNetwork(AbstractNetwork):
         ) / scale_next_encoded_state
         return next_encoded_state_normalized, reward
 
-    def initial_inference(self, observation):
+    def initial_inference(self, observation, noise_z):
         encoded_state = self.representation(observation)
         policy_logits, value = self.prediction(encoded_state)
         # reward equal to 0 for consistency
@@ -613,7 +642,7 @@ class MuZeroResidualNetwork(AbstractNetwork):
             encoded_state,
         )
 
-    def recurrent_inference(self, encoded_state, action):
+    def recurrent_inference(self, encoded_state, action, noise_z):
         next_encoded_state, reward = self.dynamics(encoded_state, action)
         policy_logits, value = self.prediction(next_encoded_state)
         return value, reward, policy_logits, next_encoded_state
