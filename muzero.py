@@ -175,7 +175,7 @@ class MuZero:
         self.self_play_worker = self_play.SelfPlay(self.checkpoint, self.Game, self.config, self.config.seed)
         if self.config.use_last_model_value:
             self.reanalyse_worker = replay_buffer.Reanalyse(self.checkpoint, self.config)
-        
+
         self.shared_storage_worker.set_info("terminate", False)
 
     def train(self, log_in_tensorboard=True):
@@ -183,32 +183,34 @@ class MuZero:
 
         while self.shared_storage_worker.get_info('training_step') < self.config.training_steps:
             self.self_play_worker.continuous_self_play(self.shared_storage_worker, self.replay_buffer_worker)
-
-            if self.shared_storage_worker.get_info('num_played_games') % 2 == 0:
-                for _ in range(100):
+            num_played_games = self.shared_storage_worker.get_info('num_played_games')
+            if num_played_games % 2 == 0:
+                for _ in range(self.config.train_times(num_played_games)):
+                    # if self.config.use_last_model_value:
+                    #     self.reanalyse_worker.reanalyse(self.replay_buffer_worker, self.shared_storage_worker)
                     self.training_worker.continuous_update_weights(self.replay_buffer_worker, self.shared_storage_worker)
-
-            if self.config.use_last_model_value:
-                self.reanalyse_worker.reanalyse(self.replay_buffer_worker, self.shared_storage_worker)
 
             if log_in_tensorboard:
                 # self.test_worker.continuous_self_play(self.shared_storage_worker, None, True)
                 self.logging_loop(self.counter)
                 self.counter += 1
 
-        self.terminate_workers()
         if self.config.save_model:
             # Persist replay buffer to disk
             print("\n\nPersisting replay buffer games to disk...")
+            saved_keys = ['num_played_games', 'num_played_steps', 'num_reanalysed_games']
+            saved_info = self.shared_storage_worker.get_info(saved_keys)
             pickle.dump(
                 {
-                    "buffer": self.replay_buffer,
-                    "num_played_games": self.checkpoint["num_played_games"],
-                    "num_played_steps": self.checkpoint["num_played_steps"],
-                    "num_reanalysed_games": self.checkpoint["num_reanalysed_games"],
+                    "buffer": self.replay_buffer_worker.buffer,
+                    "num_played_games": saved_info["num_played_games"],
+                    "num_played_steps": saved_info["num_played_steps"],
+                    "num_reanalysed_games": saved_info["num_reanalysed_games"],
                 },
                 open(os.path.join(self.config.results_path, "replay_buffer.pkl"), "wb"),
             )
+
+        self.terminate_workers()
 
     def logging_loop(self, counter):
         """
