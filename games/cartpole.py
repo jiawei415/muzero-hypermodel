@@ -118,6 +118,16 @@ class MuZeroConfig:
             return 0.25
 
 
+    def train_times(self, num_played_games):
+        # TODO Need more adjustments
+        if num_played_games < 20:
+            return 100
+        elif num_played_games < 40:
+            return 200
+        else:
+            return 400
+
+
 class Game(AbstractGame):
     """
     Game wrapper.
@@ -127,8 +137,13 @@ class Game(AbstractGame):
         self.env = gym.make("CartPole-v1")
         if seed is not None:
             self.env.seed(seed)
-        self.reward_theta = 1 * 2 * math.pi / 360
         self.hard = hard
+        if self.hard:
+            self.cos_theta_threshold = 0.95
+            self.theta_dot_threshold = 1
+            self.x_threshold = 0.1
+            self.x_dot_threshold = 1
+            
 
     def step(self, action):
         """
@@ -143,10 +158,10 @@ class Game(AbstractGame):
         observation, reward, done, _ = self.env.step(action)
         if self.hard:
             x, x_dot, theta, theta_dot = observation
-            if (-self.reward_theta < theta < self.reward_theta) and (-self.env.x_threshold < x < self.env.x_threshold):
+            if abs(math.cos(theta)) > 0.95 and abs(x) < 0.1 and abs(theta_dot) < 1 and abs(x_dot) < 1:
                 reward = 1
             else:
-                reward = 0     
+                reward = 0
         return numpy.array([[observation]]), reward, done
 
     def legal_actions(self):
