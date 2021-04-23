@@ -95,23 +95,6 @@ class Trainer:
             }
         )
 
-        # print(f"train_step: {shared_storage.get_info('training_step')}")
-
-        # Managing the self-play / training ratio
-        # if self.config.training_delay:
-        #     time.sleep(self.config.training_delay)
-        # if self.config.ratio:
-        #     while (
-        #         self.training_step
-        #         / max(
-        #             1, ray.get(shared_storage.get_info.remote("num_played_steps"))
-        #         )
-        #         > self.config.ratio
-        #         and self.training_step < self.config.training_steps
-        #         and not ray.get(shared_storage.get_info.remote("terminate"))
-        #     ):
-        #         time.sleep(0.5)
-
     def update_weights(self, batch):
         """
         Perform one training step.

@@ -3,7 +3,7 @@ import time
 import numpy
 import torch
 import models
-
+from tqdm import tqdm
 
 class SelfPlay:
     """
@@ -88,24 +88,7 @@ class SelfPlay:
                         ),
                     }
                 )
-        self.close_game()
-
-        # Managing the self-play / training ratio
-        # if not test_mode and self.config.self_play_delay:
-        #     time.sleep(self.config.self_play_delay)
-        # if not test_mode and self.config.ratio:
-        #     while (shared_storage.get_info("training_step")
-        #         / max(
-        #             1, shared_storage.get_info("num_played_steps")
-        #         )
-        #         < self.config.ratio
-        #         and shared_storage.get_info("training_step")
-        #         < self.config.training_steps
-        #         and not shared_storage.get_info("terminate")
-        #     ):
-        #         time.sleep(0.5)
-
-        
+        self.close_game()    
 
     def play_game(
         self, temperature, temperature_threshold, render, opponent, muzero_player
@@ -146,6 +129,7 @@ class SelfPlay:
                 if opponent == "self" or muzero_player == self.game.to_play():
                     root, mcts_info = MCTS(self.config).run(
                         noise_z,
+                        self.config.num_simulations,
                         self.model,
                         stacked_observations,
                         self.game.legal_actions(),
@@ -171,6 +155,7 @@ class SelfPlay:
                     )
 
                 observation, reward, done = self.game.step(action)
+                
 
                 if render:
                     print(f"Played action: {self.game.action_to_string(action)}")
@@ -183,7 +168,7 @@ class SelfPlay:
                 game_history.observation_history.append(observation)
                 game_history.reward_history.append(reward)
                 game_history.to_play_history.append(self.game.to_play())
-
+        
         return game_history
 
     def close_game(self):
@@ -264,6 +249,7 @@ class MCTS:
     def run(
         self,
         noise_z,
+        simulations,
         model,
         observation,
         legal_actions,
@@ -321,7 +307,7 @@ class MCTS:
         min_max_stats = MinMaxStats()
 
         max_tree_depth = 0
-        for _ in range(self.config.num_simulations):
+        for _ in range(simulations):
             virtual_to_play = to_play
             node = root
             search_path = [node]
@@ -494,7 +480,6 @@ class GameHistory:
         self.to_play_history = []
         self.child_visits = []
         self.root_values = []
-        self.reanalysed_predicted_root_values = None
         self.noise_history = None
         # For PER
         self.priorities = None

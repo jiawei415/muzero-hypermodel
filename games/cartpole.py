@@ -15,6 +15,7 @@ class MuZeroConfig:
 
         self.seed = 0  # Seed for numpy, torch and the game
         self.max_num_gpus = None  # Fix the maximum number of GPUs to use. It's usually faster to use a single GPU (set it to 1) if it has enough memory. None will use every GPUs available
+        self.episode = 200
 
         ### Game
         self.hard = False
@@ -94,7 +95,9 @@ class MuZeroConfig:
 
         # Reanalyze (See paper appendix Reanalyse)
         self.use_reanalyse = False  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
+        self.use_reanalyse_mcts = False
         self.reanalyse_on_gpu = False
+        self.reanalyse_num_simulations = 10
         self.target_update_freq = 100
 
         ### Adjust the self play / training ratio to avoid over/underfitting
@@ -122,13 +125,13 @@ class MuZeroConfig:
     def train_times(self, num_played_games):
         # TODO Need more adjustments
         if num_played_games <= 10:
-            return 100
+            return 200 if self.use_reanalyse else 100
         elif num_played_games <= 20:
-            return 200
+            return 400 if self.use_reanalyse else 200
         elif num_played_games <= 40:
-            return 400
+            return 800 if self.use_reanalyse else 400
         else:
-            return 600
+            return 1000 if self.use_reanalyse else 600
 
 
 class Game(AbstractGame):
@@ -146,7 +149,7 @@ class Game(AbstractGame):
             self.theta_dot_threshold = 1
             self.x_threshold = 0.1
             self.x_dot_threshold = 1
-            
+
 
     def step(self, action):
         """
