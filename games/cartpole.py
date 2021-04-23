@@ -93,8 +93,9 @@ class MuZeroConfig:
         self.PER_alpha = 0.5  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
 
         # Reanalyze (See paper appendix Reanalyse)
-        self.use_last_model_value = False  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
+        self.use_reanalyse = False  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
         self.reanalyse_on_gpu = False
+        self.target_update_freq = 100
 
         ### Adjust the self play / training ratio to avoid over/underfitting
         self.self_play_delay = 0  # Number of seconds to wait after each played game
@@ -120,12 +121,14 @@ class MuZeroConfig:
 
     def train_times(self, num_played_games):
         # TODO Need more adjustments
-        if num_played_games < 20:
+        if num_played_games <= 10:
             return 100
-        elif num_played_games < 40:
+        elif num_played_games <= 20:
             return 200
-        else:
+        elif num_played_games <= 40:
             return 400
+        else:
+            return 600
 
 
 class Game(AbstractGame):
