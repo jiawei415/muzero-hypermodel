@@ -155,7 +155,6 @@ class MuZero:
                 "num_played_steps",
                 "num_reanalysed_games",
             ]
-            self.counter = 0
 
         # Manage GPUs
         if 0 < self.num_gpus:
@@ -179,24 +178,22 @@ class MuZero:
         self.reanalyse_worker = replay_buffer.Reanalyse(self.checkpoint, self.shared_storage_worker, self.config)
         self.replay_buffer_worker = replay_buffer.ReplayBuffer(self.checkpoint, self.replay_buffer, self.reanalyse_worker, self.config)
 
-
     def train(self, log_in_tensorboard=True):
         self.init_workers(log_in_tensorboard=log_in_tensorboard)
 
-        while self.shared_storage_worker.get_info('training_step') < self.config.training_steps:
+        # while self.shared_storage_worker.get_info('training_step') < self.config.training_steps:
+        for counter in range(self.config.episode):
             self.self_play_worker.continuous_self_play(self.shared_storage_worker, self.replay_buffer_worker)
             num_played_games = self.shared_storage_worker.get_info('num_played_games')
             if num_played_games % 2 == 0:
                 train_times = self.config.train_times(num_played_games)
-                print('train time:')
                 for _ in tqdm(range(train_times)):
                 # for _ in range(train_times)
                     self.training_worker.continuous_update_weights(self.replay_buffer_worker, self.shared_storage_worker)
 
             if log_in_tensorboard:
                 # self.test_worker.continuous_self_play(self.shared_storage_worker, None, True)
-                self.logging_loop(self.counter)
-                self.counter += 1
+                self.logging_loop(counter)
 
         if self.config.save_model:
             # Persist replay buffer to disk
@@ -223,50 +220,50 @@ class MuZero:
         info = self.shared_storage_worker.get_info(self.keys)
         try:
             self.writer.add_scalar(
-                "1.Total_reward/1.Total_reward", info["total_reward"], self.counter,
+                "1.Total_reward/1.Total_reward", info["total_reward"], counter,
             )
             self.writer.add_scalar(
-                "1.Total_reward/2.Mean_value", info["mean_value"], self.counter,
+                "1.Total_reward/2.Mean_value", info["mean_value"], counter,
             )
             self.writer.add_scalar(
-                "1.Total_reward/3.Episode_length", info["episode_length"], self.counter,
+                "1.Total_reward/3.Episode_length", info["episode_length"], counter,
             )
             self.writer.add_scalar(
-                "1.Total_reward/4.MuZero_reward", info["muzero_reward"], self.counter,
+                "1.Total_reward/4.MuZero_reward", info["muzero_reward"], counter,
             )
             self.writer.add_scalar(
                 "1.Total_reward/5.Opponent_reward",
                 info["opponent_reward"],
-                self.counter,
+                counter,
             )
             self.writer.add_scalar(
-                "2.Workers/1.Self_played_games", info["num_played_games"], self.counter,
+                "2.Workers/1.Self_played_games", info["num_played_games"], counter,
             )
             self.writer.add_scalar(
-                "2.Workers/2.Training_steps", info["training_step"], self.counter
+                "2.Workers/2.Training_steps", info["training_step"], counter
             )
             self.writer.add_scalar(
-                "2.Workers/3.Self_played_steps", info["num_played_steps"], self.counter
+                "2.Workers/3.Self_played_steps", info["num_played_steps"], counter
             )
             self.writer.add_scalar(
                 "2.Workers/4.Reanalysed_games",
                 info["num_reanalysed_games"],
-                self.counter,
+                counter,
             )
             self.writer.add_scalar(
                 "2.Workers/5.Training_steps_per_self_played_step_ratio",
                 info["training_step"] / max(1, info["num_played_steps"]),
-                self.counter,
+                counter,
             )
-            self.writer.add_scalar("2.Workers/6.Learning_rate", info["lr"], self.counter)
+            self.writer.add_scalar("2.Workers/6.Learning_rate", info["lr"], counter)
             self.writer.add_scalar(
-                "3.Loss/1.Total_weighted_loss", info["total_loss"], self.counter
+                "3.Loss/1.Total_weighted_loss", info["total_loss"], counter
             )
-            self.writer.add_scalar("3.Loss/Value_loss", info["value_loss"], self.counter)
-            self.writer.add_scalar("3.Loss/Reward_loss", info["reward_loss"], self.counter)
-            self.writer.add_scalar("3.Loss/Policy_loss", info["policy_loss"], self.counter)
+            self.writer.add_scalar("3.Loss/Value_loss", info["value_loss"], counter)
+            self.writer.add_scalar("3.Loss/Reward_loss", info["reward_loss"], counter)
+            self.writer.add_scalar("3.Loss/Policy_loss", info["policy_loss"], counter)
             print(
-                f'Counter: {self.counter}. Last play reward: {info["total_reward"]:.2f}. Training step: {info["training_step"]}/{self.config.training_steps}. Played games: {info["num_played_games"]}. Loss: {info["total_loss"]:.2f}',
+                f'Counter: {counter}/{self.config.episode}. Last play reward: {info["total_reward"]:.2f}. Training step: {info["training_step"]}. Played games: {info["num_played_games"]}. Loss: {info["total_loss"]:.2f}',
                 end="\r",
             )
         except KeyboardInterrupt:

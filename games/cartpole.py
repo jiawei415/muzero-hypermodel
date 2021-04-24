@@ -2,7 +2,6 @@ import datetime
 import os
 
 import gym
-import math
 import numpy
 import torch
 
@@ -18,7 +17,6 @@ class MuZeroConfig:
         self.episode = 200
 
         ### Game
-        self.hard = False
         self.observation_shape = (1, 1, 4)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
         self.action_space = list(range(2))  # Fixed list of all possible actions. You should only edit the length
         self.players = list(range(1))  # List of players. You should only edit the length
@@ -139,15 +137,10 @@ class Game(AbstractGame):
     Game wrapper.
     """
 
-    def __init__(self, seed=None, hard=False):
+    def __init__(self, seed=None):
         self.env = gym.make("CartPole-v1")
         if seed is not None:
             self.env.seed(seed)
-        self.hard = hard
-        if self.hard:
-            self.theta_threshold = 90 * 2 * math.pi / 360
-            self.x_threshold = 2.4
-            self.theta_init = 85 * 2 * math.pi / 360
 
     def step(self, action):
         """
@@ -161,13 +154,6 @@ class Game(AbstractGame):
         """
 
         observation, reward, done, _ = self.env.step(action)
-        if self.hard:
-            x, x_dot, theta, theta_dot = observation
-            if abs(math.cos(theta)) > 0.95 and abs(x) < 0.1 and abs(theta_dot) < 1 and abs(x_dot) < 1:
-                reward = 1
-            else:
-                reward = 0
-            done = bool(abs(x) > self.x_threshold or abs(theta) > self.theta_threshold)
         return numpy.array([[observation]]), reward, done
 
     def legal_actions(self):
@@ -191,12 +177,6 @@ class Game(AbstractGame):
             Initial observation of the game.
         """
         observation = self.env.reset()
-        if self.hard:
-            x = numpy.random.uniform(-1, 1)
-            x_dot = numpy.random.uniform(-2, 2)
-            theta = numpy.random.uniform(-self.theta_init, self.theta_init)
-            theta_dot = numpy.random.uniform(-1.5, 1.5)
-            observation = numpy.array([x, x_dot, theta, theta_dot])
         return numpy.array([[observation]])
 
     def close(self):

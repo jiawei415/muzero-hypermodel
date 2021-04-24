@@ -40,7 +40,7 @@ class ReplayBuffer:
                 for i, root_value in enumerate(game_history.root_values):
                     priority = (
                         numpy.abs(
-                            root_value - compute_target_value(game_history, i, self.config.td_steps, self.config.discount)
+                            root_value - self.compute_target_value(game_history, i)
                         )
                         ** self.config.PER_alpha
                     )
@@ -224,6 +224,36 @@ class ReplayBuffer:
                     self.buffer[game_id].priorities
                 )
 
+    def compute_target_value(self, game_history, index):
+            # The value target is the discounted root value of the search tree td_steps into the
+            # future, plus the discounted sum of all rewards until then.
+            bootstrap_index = index + self.config.td_steps
+            if bootstrap_index < len(game_history.root_values):
+                root_values = game_history.root_values
+                last_step_value = (
+                    root_values[bootstrap_index]
+                    if game_history.to_play_history[bootstrap_index]
+                    == game_history.to_play_history[index]
+                    else -root_values[bootstrap_index]
+                )
+
+                value = last_step_value * self.config.discount ** self.config.td_steps
+            else:
+                value = 0
+
+            for i, reward in enumerate(
+                game_history.reward_history[index + 1 : bootstrap_index + 1]
+            ):
+                # The value is oriented from the perspective of the current player
+                value += (
+                    reward
+                    if game_history.to_play_history[index]
+                    == game_history.to_play_history[index + i]
+                    else -reward
+                ) * self.config.discount ** i
+
+            return value
+
     def make_target(self, game_history, state_index):
         """
         Generate targets for every unroll steps.
@@ -232,7 +262,7 @@ class ReplayBuffer:
         for current_index in range(
             state_index, state_index + self.config.num_unroll_steps + 1
         ):
-            value = compute_target_value(game_history, current_index, self.config.td_steps, self.config.discount)
+            value = self.compute_target_value(game_history, current_index)
 
             if current_index < len(game_history.root_values):
                 target_values.append(value)
@@ -299,7 +329,6 @@ class Reanalyse:
             self.target_model.set_weights(self.shared_storage.get_info("weights"))
 
         target_game_history = copy.deepcopy(game_history)
-        # game_history_len = len(target_game_history.root_values)
         target_game_history.child_visits[start:] = []
         target_game_history.root_values[start:] = []
         target_noise_z = numpy.random.normal(0,1,[1,32])
@@ -309,7 +338,6 @@ class Reanalyse:
                 i,
                 self.config.stacked_observations,
             )
-            
             root, mcts_info = MCTS(self.config).run(
                 target_noise_z,
                 self.config.reanalyse_num_simulations,
@@ -319,63 +347,9 @@ class Reanalyse:
                 self.game.to_play(),
                 True,
             )
-
             target_game_history.store_search_statistics(root, self.config.action_space)
-  
+
         self.num_reanalysed_games += 1
         self.shared_storage.set_info("num_reanalysed_games", self.num_reanalysed_games)
-        # if self.config.PER:
-        #     root_values = target_game_history.root_values
-        #     priorities = []
-        #     for i, root_value in enumerate(root_values):
-        #         priority = (
-        #             numpy.abs(
-        #                 root_value - compute_target_value(target_game_history, i, self.config.td_steps, self.config.discount)
-        #             )
-        #             ** self.config.PER_alpha
-        #         )
-        #         priorities.append(priority)
-
-        #     game_history.priorities = numpy.array(priorities, dtype="float32")
-        #     game_history.game_priority = numpy.max(game_history.priorities)
 
         return target_game_history
-
-def compute_target_value(game_history, index, td_steps, discount):
-        # The value target is the discounted root value of the search tree td_steps into the
-        # future, plus the discounted sum of all rewards until then.
-        bootstrap_index = index + td_steps
-        if bootstrap_index < len(game_history.root_values):
-            root_values = game_history.root_values
-            last_step_value = (
-                root_values[bootstrap_index]
-                if game_history.to_play_history[bootstrap_index]
-                == game_history.to_play_history[index]
-                else -root_values[bootstrap_index]
-            )
-
-            value = last_step_value * discount ** td_steps
-        else:
-            value = 0
-
-        for i, reward in enumerate(
-            game_history.reward_history[index + 1 : bootstrap_index + 1]
-        ):
-            # The value is oriented from the perspective of the current player
-            value += (
-                reward
-                if game_history.to_play_history[index]
-                == game_history.to_play_history[index + i]
-                else -reward
-            ) * discount ** i
-
-        return value
-
-def get_target_game_history(game_history, start, end):
-    target_game_history = GameHistory()
-    target_game_history.observation_history = game_history.observation_history[start: end]
-    target_game_history.action_history = game_history.action_history[start: end]
-    target_game_history.reward_history = game_history.reward_history[start: end]
-    target_game_history.to_play_history = game_history.to_play_history[start: end]
-    target_game_history.priorities = game_history.priorities[start: end]
-    target_game_history.game_priority = game_history.game_priority

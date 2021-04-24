@@ -12,10 +12,7 @@ class SelfPlay:
 
     def __init__(self, initial_checkpoint, Game, config, seed):
         self.config = config
-        if hasattr(config, 'hard'):
-            self.game = Game(seed, config.hard)
-        else:
-            self.game = Game(seed)
+        self.game = Game(seed)
 
         # Fix random generator seed
         numpy.random.seed(seed)
@@ -155,7 +152,6 @@ class SelfPlay:
                     )
 
                 observation, reward, done = self.game.step(action)
-                
 
                 if render:
                     print(f"Played action: {self.game.action_to_string(action)}")
@@ -168,7 +164,7 @@ class SelfPlay:
                 game_history.observation_history.append(observation)
                 game_history.reward_history.append(reward)
                 game_history.to_play_history.append(self.game.to_play())
-
+        
         return game_history
 
     def close_game(self):
