@@ -195,6 +195,7 @@ class MuZero:
                 # self.test_worker.continuous_self_play(self.shared_storage_worker, None, True)
                 self.logging_loop(counter)
 
+
         if self.config.save_model:
             # Persist replay buffer to disk
             print("\n\nPersisting replay buffer games to disk...")

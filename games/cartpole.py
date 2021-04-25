@@ -92,7 +92,7 @@ class MuZeroConfig:
         self.PER_alpha = 0.5  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
 
         # Reanalyze (See paper appendix Reanalyse)
-        self.use_reanalyse = False  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
+        self.use_reanalyse = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
         self.use_reanalyse_mcts = False
         self.reanalyse_on_gpu = False
         self.reanalyse_num_simulations = 10

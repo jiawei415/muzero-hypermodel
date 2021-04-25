@@ -4,8 +4,9 @@ import numpy
 import torch
 import models
 import importlib
+import threading
+import multiprocessing
 from tqdm import tqdm
-
 from self_play import MCTS, GameHistory
 
 class ReplayBuffer:
@@ -79,11 +80,8 @@ class ReplayBuffer:
         ) = ([], [], [], [], [], [], [], [])
         weight_batch = [] if self.config.PER else None
 
-        # print(f"get batch time:")
-        # for game_id, game_history, game_prob in tqdm(self.sample_n_games(self.config.batch_size)):
-        for game_id, game_history, game_prob in self.sample_n_games(self.config.batch_size):
+        def multi_reanalyse(game_id, game_history, game_prob):
             game_pos, pos_prob = self.sample_position(game_history)
-            index_batch.append([game_id, game_pos])
             if self.config.use_reanalyse:
                 start_index = game_pos
                 end_index = min(game_pos+self.config.num_unroll_steps+self.config.td_steps+1, len(game_history.root_values))
@@ -91,6 +89,9 @@ class ReplayBuffer:
             else:
                 target_game_history = game_history
             values, rewards, policies, actions = self.make_target(target_game_history, game_pos)
+ 
+            lock.acquire()
+            index_batch.append([game_id, game_pos])
             
             observation_batch.append(
                 target_game_history.get_stacked_observations(
@@ -113,7 +114,31 @@ class ReplayBuffer:
             )
             if self.config.PER:
                 weight_batch.append(1 / (self.total_samples * game_prob * pos_prob))
-
+            lock.release()
+    
+        index_batch = multiprocessing.Manager().list()
+        observation_batch = multiprocessing.Manager().list()
+        noise_batch = multiprocessing.Manager().list()
+        action_batch = multiprocessing.Manager().list()
+        value_batch = multiprocessing.Manager().list()
+        reward_batch = multiprocessing.Manager().list()
+        policy_batch = multiprocessing.Manager().list()
+        weight_batch = multiprocessing.Manager().list()
+        gradient_scale_batch = multiprocessing.Manager().list()
+        lock = multiprocessing.Manager().Lock()
+        process_list = []
+        # pool = multiprocessing.Pool(8)
+        for game_id, game_history, game_prob in self.sample_n_games(self.config.batch_size):
+            # multi_reanalyse(game_id, game_history, game_prob)
+            # pool.apply_async(func=multi_reanalyse, args=(game_id, game_history, game_prob,))
+            p = multiprocessing.Process(target=multi_reanalyse, args=(game_id, game_history, game_prob,))
+            p.start()
+            process_list.append(p)
+        for p in process_list:
+            if p.is_alive():
+                p.join()
+        # pool.close()
+        # pool.join()
         if self.config.PER:
             weight_batch = numpy.array(weight_batch, dtype="float32") / max(weight_batch)
             
