@@ -89,10 +89,10 @@ class ReplayBuffer:
             else:
                 target_game_history = game_history
             values, rewards, policies, actions = self.make_target(target_game_history, game_pos)
- 
+
             lock.acquire()
             index_batch.append([game_id, game_pos])
-            
+
             observation_batch.append(
                 target_game_history.get_stacked_observations(
                     game_pos, self.config.stacked_observations
@@ -115,7 +115,8 @@ class ReplayBuffer:
             if self.config.PER:
                 weight_batch.append(1 / (self.total_samples * game_prob * pos_prob))
             lock.release()
-    
+
+        # multi processing
         index_batch = multiprocessing.Manager().list()
         observation_batch = multiprocessing.Manager().list()
         noise_batch = multiprocessing.Manager().list()
@@ -129,7 +130,6 @@ class ReplayBuffer:
         process_list = []
         # pool = multiprocessing.Pool(8)
         for game_id, game_history, game_prob in self.sample_n_games(self.config.batch_size):
-            # multi_reanalyse(game_id, game_history, game_prob)
             # pool.apply_async(func=multi_reanalyse, args=(game_id, game_history, game_prob,))
             p = multiprocessing.Process(target=multi_reanalyse, args=(game_id, game_history, game_prob,))
             p.start()
@@ -139,9 +139,27 @@ class ReplayBuffer:
                 p.join()
         # pool.close()
         # pool.join()
+
+        # # multi threading
+        # lock = threading.RLock()
+        # threads = []
+        # for game_id, game_history, game_prob in self.sample_n_games(self.config.batch_size):
+        #     t = threading.Thread(target=multi_reanalyse, args=(game_id, game_history, game_prob,))
+        #     t.start()
+        #     threads.append(t)
+
+        # for t in threads:
+        #     if t.isAlive():
+        #         t.join()
+
+        # # sequential
+        # for game_id, game_history, game_prob in self.sample_n_games(self.config.batch_size):
+        #     multi_reanalyse(game_id, game_history, game_prob)
+
+
         if self.config.PER:
             weight_batch = numpy.array(weight_batch, dtype="float32") / max(weight_batch)
-            
+
         # observation_batch: batch, channels, height, width
         # action_batch: batch, num_unroll_steps+1
         # value_batch: batch, num_unroll_steps+1
