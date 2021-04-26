@@ -6,6 +6,7 @@ import models
 import importlib
 import threading
 import multiprocessing
+from multiprocessing import Pool
 from tqdm import tqdm
 from self_play import MCTS, GameHistory
 
@@ -67,6 +68,19 @@ class ReplayBuffer:
     def get_buffer(self):
         return self.buffer
 
+    def multi_reanalyse(self, game_datas):
+        target_game_datas = []
+        for game_data in game_datas:
+            game_id, game_history, game_prob, game_pos, pos_prob = game_data
+            if self.config.use_reanalyse:
+                start_index = game_pos
+                end_index = min(game_pos+self.config.num_unroll_steps+self.config.td_steps+1, len(game_history.root_values))
+                target_game_history = self.reanalyse_worker.reanalyse(game_history, start_index, end_index)
+            else:
+                target_game_history = game_history
+            target_game_datas.append((game_id, target_game_history, game_prob, game_pos, pos_prob))
+        return target_game_datas
+
     def get_batch(self):
         (
             index_batch,
@@ -80,83 +94,42 @@ class ReplayBuffer:
         ) = ([], [], [], [], [], [], [], [])
         weight_batch = [] if self.config.PER else None
 
-        def multi_reanalyse(game_id, game_history, game_prob):
-            game_pos, pos_prob = self.sample_position(game_history)
-            if self.config.use_reanalyse:
-                start_index = game_pos
-                end_index = min(game_pos+self.config.num_unroll_steps+self.config.td_steps+1, len(game_history.root_values))
-                target_game_history = self.reanalyse_worker.reanalyse(game_history, start_index, end_index)
-            else:
-                target_game_history = game_history
-            values, rewards, policies, actions = self.make_target(target_game_history, game_pos)
-
-            lock.acquire()
-            index_batch.append([game_id, game_pos])
-
-            observation_batch.append(
-                target_game_history.get_stacked_observations(
-                    game_pos, self.config.stacked_observations
-                )
-            )
-            noise_batch.append([target_game_history.noise_history] * (self.config.num_unroll_steps + 1))
-            action_batch.append(actions)
-            value_batch.append(values)
-            reward_batch.append(rewards)
-            policy_batch.append(policies)
-            gradient_scale_batch.append(
-                [
-                    min(
-                        self.config.num_unroll_steps,
-                        len(target_game_history.action_history) - game_pos,
+        results = []
+        pool = Pool(processes=10)
+        n_games = self.sample_n_games(self.config.batch_size)
+        interval = int(self.config.batch_size / 8)
+        for i in range(8):
+            # results.append(self.multi_reanalyse(n_games[i:i+interval]))
+            results.append(pool.apply_async(func=self.multi_reanalyse, args=(n_games[i:i+interval],)))
+        pool.close()
+        pool.join()
+        for result in results:
+            for game_id, target_game_history, game_prob, game_pos, pos_prob in result.get():
+                values, rewards, policies, actions = self.make_target(target_game_history, game_pos)
+                index_batch.append([game_id, game_pos])
+                observation_batch.append(
+                    target_game_history.get_stacked_observations(
+                        game_pos, self.config.stacked_observations
                     )
-                ]
-                * len(actions)
-            )
-            if self.config.PER:
-                weight_batch.append(1 / (self.total_samples * game_prob * pos_prob))
-            lock.release()
+                )
+                noise_batch.append([target_game_history.noise_history] * (self.config.num_unroll_steps + 1))
+                action_batch.append(actions)
+                value_batch.append(values)
+                reward_batch.append(rewards)
+                policy_batch.append(policies)
+                gradient_scale_batch.append(
+                    [
+                        min(
+                            self.config.num_unroll_steps,
+                            len(target_game_history.action_history) - game_pos,
+                        )
+                    ]
+                    * len(actions)
+                )
+                if self.config.PER:
+                    weight_batch.append(1 / (self.total_samples * game_prob * pos_prob))
 
-        # multi processing
-        index_batch = multiprocessing.Manager().list()
-        observation_batch = multiprocessing.Manager().list()
-        noise_batch = multiprocessing.Manager().list()
-        action_batch = multiprocessing.Manager().list()
-        value_batch = multiprocessing.Manager().list()
-        reward_batch = multiprocessing.Manager().list()
-        policy_batch = multiprocessing.Manager().list()
-        weight_batch = multiprocessing.Manager().list()
-        gradient_scale_batch = multiprocessing.Manager().list()
-        lock = multiprocessing.Manager().Lock()
-        process_list = []
-        # pool = multiprocessing.Pool(8)
-        for game_id, game_history, game_prob in self.sample_n_games(self.config.batch_size):
-            # pool.apply_async(func=multi_reanalyse, args=(game_id, game_history, game_prob,))
-            p = multiprocessing.Process(target=multi_reanalyse, args=(game_id, game_history, game_prob,))
-            p.start()
-            process_list.append(p)
-        for p in process_list:
-            if p.is_alive():
-                p.join()
-        # pool.close()
-        # pool.join()
-
-        # # multi threading
-        # lock = threading.RLock()
-        # threads = []
-        # for game_id, game_history, game_prob in self.sample_n_games(self.config.batch_size):
-        #     t = threading.Thread(target=multi_reanalyse, args=(game_id, game_history, game_prob,))
-        #     t.start()
-        #     threads.append(t)
-
-        # for t in threads:
-        #     if t.isAlive():
-        #         t.join()
-
-        # # sequential
-        # for game_id, game_history, game_prob in self.sample_n_games(self.config.batch_size):
-        #     multi_reanalyse(game_id, game_history, game_prob)
-
-
+        pool.terminate()
         if self.config.PER:
             weight_batch = numpy.array(weight_batch, dtype="float32") / max(weight_batch)
 
@@ -215,8 +188,9 @@ class ReplayBuffer:
         else:
             selected_games = numpy.random.choice(list(self.buffer.keys()), n_games)
             game_prob_dict = {}
-        ret = [(game_id, self.buffer[game_id], game_prob_dict.get(game_id))
+        ret = [(game_id, self.buffer[game_id], game_prob_dict.get(game_id)) + (self.sample_position(self.buffer[game_id]))
                for game_id in selected_games]
+
         return ret
 
     def sample_position(self, game_history, force_uniform=False):
@@ -396,3 +370,4 @@ class Reanalyse:
         self.shared_storage.set_info("num_reanalysed_games", self.num_reanalysed_games)
 
         return target_game_history
+

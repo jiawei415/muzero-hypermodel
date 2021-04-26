@@ -188,7 +188,7 @@ class MuZero:
             if num_played_games % 2 == 0:
                 train_times = self.config.train_times(num_played_games)
                 for _ in tqdm(range(train_times)):
-                # for _ in range(train_times)
+                # for _ in range(train_times):
                     self.training_worker.continuous_update_weights(self.replay_buffer_worker, self.shared_storage_worker)
 
             if log_in_tensorboard:
@@ -405,7 +405,7 @@ class CPUActor:
 
     def get_initial_weights(self, config):
         model = models.MuZeroNetwork(config)
-        print("\n", model)
+        # print("\n", model)
         weigths = model.get_weights()
         summary = str(model).replace("\n", " \n\n")
         return weigths, summary
