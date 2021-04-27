@@ -264,8 +264,8 @@ class MuZero:
             self.writer.add_scalar("3.Loss/Reward_loss", info["reward_loss"], counter)
             self.writer.add_scalar("3.Loss/Policy_loss", info["policy_loss"], counter)
             print(
-                f'Counter: {counter}/{self.config.episode}. Last play reward: {info["total_reward"]:.2f}. Training step: {info["training_step"]}. Played games: {info["num_played_games"]}. Loss: {info["total_loss"]:.2f}',
-                end="\r",
+                f'Counter: {counter}/{self.config.episode}. Last play reward: {info["total_reward"]:.2f}. Training step: {info["training_step"]}. Played games: {info["num_played_games"]}',
+                # end="\r",
             )
         except KeyboardInterrupt:
             pass
