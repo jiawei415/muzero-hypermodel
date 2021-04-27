@@ -4,9 +4,7 @@ import numpy
 import torch
 import models
 import importlib
-import threading
 import multiprocessing
-from multiprocessing import Pool
 from tqdm import tqdm
 from self_play import MCTS, GameHistory
 
@@ -95,16 +93,22 @@ class ReplayBuffer:
         weight_batch = [] if self.config.PER else None
 
         results = []
-        pool = Pool(processes=10)
         n_games = self.sample_n_games(self.config.batch_size)
         interval = int(self.config.batch_size / self.config.num_process)
-        for i in range(0, self.config.batch_size, interval):
-            # results.append(self.multi_reanalyse(n_games[i:i+interval]))
-            results.append(pool.apply_async(func=self.multi_reanalyse, args=(n_games[i:i+interval],)))
-        pool.close()
-        pool.join()
+
+        if self.config.use_multiprocess:
+            pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
+            for i in range(0, self.config.batch_size, interval):
+                results.append(pool.apply_async(func=self.multi_reanalyse, args=(n_games[i:i+interval],)))
+            pool.close()
+            pool.join()
+        else:
+            for i in range(0, self.config.batch_size, interval):
+                results.append(self.multi_reanalyse(n_games[i:i+interval]))
+
         for result in results:
-            for game_id, target_game_history, game_prob, game_pos, pos_prob in result.get():
+            res = result.get() if self.config.use_multiprocess else result
+            for game_id, target_game_history, game_prob, game_pos, pos_prob in res:
                 values, rewards, policies, actions = self.make_target(target_game_history, game_pos)
                 index_batch.append([game_id, game_pos])
                 observation_batch.append(
@@ -129,7 +133,6 @@ class ReplayBuffer:
                 if self.config.PER:
                     weight_batch.append(1 / (self.total_samples * game_prob * pos_prob))
 
-        pool.terminate()
         if self.config.PER:
             weight_batch = numpy.array(weight_batch, dtype="float32") / max(weight_batch)
 

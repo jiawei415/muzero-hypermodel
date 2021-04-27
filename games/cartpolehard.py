@@ -98,6 +98,7 @@ class MuZeroConfig:
         self.reanalyse_num_simulations = 10
         self.target_update_freq = 100
         self.num_process = 8
+        self.use_multiprocess = True
 
         ### Adjust the self play / training ratio to avoid over/underfitting
         self.self_play_delay = 0  # Number of seconds to wait after each played game
