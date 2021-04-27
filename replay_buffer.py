@@ -97,8 +97,8 @@ class ReplayBuffer:
         results = []
         pool = Pool(processes=10)
         n_games = self.sample_n_games(self.config.batch_size)
-        interval = int(self.config.batch_size / 8)
-        for i in range(8):
+        interval = int(self.config.batch_size / self.config.num_process)
+        for i in range(0, self.config.batch_size, interval):
             # results.append(self.multi_reanalyse(n_games[i:i+interval]))
             results.append(pool.apply_async(func=self.multi_reanalyse, args=(n_games[i:i+interval],)))
         pool.close()
