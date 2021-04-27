@@ -97,6 +97,7 @@ class MuZeroConfig:
         self.reanalyse_on_gpu = False
         self.reanalyse_num_simulations = 10
         self.target_update_freq = 100
+        self.num_process = 8
 
         ### Adjust the self play / training ratio to avoid over/underfitting
         self.self_play_delay = 0  # Number of seconds to wait after each played game
@@ -123,13 +124,13 @@ class MuZeroConfig:
     def train_times(self, num_played_games):
         # TODO Need more adjustments
         if num_played_games <= 10:
-            return 200 if self.use_reanalyse else 100
+            return 100 # 200 if self.use_reanalyse else 100
         elif num_played_games <= 20:
-            return 400 if self.use_reanalyse else 200
+            return 200 # 400 if self.use_reanalyse else 200
         elif num_played_games <= 40:
-            return 800 if self.use_reanalyse else 400
+            return 400 # 800 if self.use_reanalyse else 400
         else:
-            return 1000 if self.use_reanalyse else 600
+            return 600 # 1000 if self.use_reanalyse else 600
 
 
 class Game(AbstractGame):

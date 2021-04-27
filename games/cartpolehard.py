@@ -92,11 +92,12 @@ class MuZeroConfig:
         self.PER_alpha = 0.5  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
 
         # Reanalyze (See paper appendix Reanalyse)
-        self.use_reanalyse = False  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
+        self.use_reanalyse = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
         self.use_reanalyse_mcts = False
         self.reanalyse_on_gpu = False
         self.reanalyse_num_simulations = 10
         self.target_update_freq = 100
+        self.num_process = 8
 
         ### Adjust the self play / training ratio to avoid over/underfitting
         self.self_play_delay = 0  # Number of seconds to wait after each played game
@@ -123,13 +124,13 @@ class MuZeroConfig:
     def train_times(self, num_played_games):
         # TODO Need more adjustments
         if num_played_games <= 10:
-            return 200 if self.use_reanalyse else 100
+            return 100 # 200 if self.use_reanalyse else 100
         elif num_played_games <= 20:
-            return 400 if self.use_reanalyse else 200
+            return 200 # 400 if self.use_reanalyse else 200
         elif num_played_games <= 40:
-            return 800 if self.use_reanalyse else 400
+            return 400 # 800 if self.use_reanalyse else 400
         else:
-            return 1000 if self.use_reanalyse else 600
+            return 600 # 1000 if self.use_reanalyse else 600
 
 
 class Game(AbstractGame):
@@ -225,7 +226,14 @@ class CartPoleHard(gym.Env):
         self.tau = 0.02  # seconds between state updates
         self.kinematics_integrator = 'euler'
         # Angle at which to fail the episode
-        self.theta_threshold_radians = 90 * 2 * math.pi / 360
+        '''
+        Original
+        self.theta_threshold_radians = 12 * 2 * math.pi / 360
+        '''
+        #################################################
+        '''Hard'''
+        self.theta_threshold_radians = 90 * 2 * math.pi / 360  
+        '''Hard'''
         self.x_threshold = 2.4
         # Angle limit set to 2 * theta_threshold_radians so failing observation
         # is still within bounds.
@@ -240,6 +248,9 @@ class CartPoleHard(gym.Env):
         self.viewer = None
         self.state = None
         self.steps_beyond_done = None
+
+        ###############################################
+        '''Hard'''
         self.theta_init = 45 * 2 * math.pi / 360
 
     def seed(self, seed=None):
@@ -273,6 +284,25 @@ class CartPoleHard(gym.Env):
             theta = theta + self.tau * theta_dot
 
         self.state = (x, x_dot, theta, theta_dot)
+        
+        '''
+        Original
+        done = bool(
+            x < -self.x_threshold
+            or x > self.x_threshold
+            or theta < -self.theta_threshold_radians
+            or theta > self.theta_threshold_radians
+        )
+
+        if not done:
+            reward = 1.0
+        elif self.steps_beyond_done is None:
+            # Pole just fell!
+            self.steps_beyond_done = 0
+            reward = 1.0
+        '''
+        ################################################
+        ''' Hard '''
         done = bool(abs(x) > self.x_threshold or abs(theta) > self.theta_threshold_radians)
         if not done:
             if abs(math.cos(theta)) > 0.95 and abs(x) < 0.1 and abs(theta_dot) < 1 and abs(x_dot) < 1:
@@ -297,11 +327,19 @@ class CartPoleHard(gym.Env):
         return np.array(self.state), reward, done, {}
 
     def reset(self):
+        '''
+        Original
+        self.state = self.np_random.uniform(low=-0.05, high=0.05, size=(4,))
+        '''
+        ###########################################################
+        ''' Hard: '''
         x = np.random.uniform(-1, 1)
         x_dot = np.random.uniform(-0.5, 0.5)
         theta = np.random.uniform(-self.theta_init, self.theta_init)
         theta_dot = np.random.uniform(-0.5, 0.5)
         self.state = np.array([x, x_dot, theta, theta_dot])
+        ''' Hard: '''
+
         self.steps_beyond_done = None
         return self.state
 
