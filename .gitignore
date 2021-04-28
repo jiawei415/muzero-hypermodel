@@ -93,3 +93,4 @@ venv.bak/
 dmypy.json
 
 results/
+tmp*
