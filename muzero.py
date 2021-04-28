@@ -188,12 +188,13 @@ class MuZero:
             if num_played_games % 2 == 0:
                 train_times = self.config.train_times(num_played_games)
                 # for _ in tqdm(range(train_times)):
-                for _ in range(train_times)
+                for _ in range(train_times):
                     self.training_worker.continuous_update_weights(self.replay_buffer_worker, self.shared_storage_worker)
 
             if log_in_tensorboard:
                 # self.test_worker.continuous_self_play(self.shared_storage_worker, None, True)
                 self.logging_loop(counter)
+
 
         if self.config.save_model:
             # Persist replay buffer to disk
@@ -263,8 +264,8 @@ class MuZero:
             self.writer.add_scalar("3.Loss/Reward_loss", info["reward_loss"], counter)
             self.writer.add_scalar("3.Loss/Policy_loss", info["policy_loss"], counter)
             print(
-                f'Counter: {counter}/{self.config.episode}. Last play reward: {info["total_reward"]:.2f}. Training step: {info["training_step"]}. Played games: {info["num_played_games"]}. Loss: {info["total_loss"]:.2f}',
-                end="\r",
+                f'Counter: {counter}/{self.config.episode}. Last play reward: {info["total_reward"]:.2f}. Training step: {info["training_step"]}. Played games: {info["num_played_games"]}',
+                # end="\r",
             )
         except KeyboardInterrupt:
             pass
@@ -404,7 +405,7 @@ class CPUActor:
 
     def get_initial_weights(self, config):
         model = models.MuZeroNetwork(config)
-        print("\n", model)
+        # print("\n", model)
         weigths = model.get_weights()
         summary = str(model).replace("\n", " \n\n")
         return weigths, summary
