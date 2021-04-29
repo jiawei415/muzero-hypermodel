@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 import nevergrad
 import numpy
-import ray
+# import ray
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
