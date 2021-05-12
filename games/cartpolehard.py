@@ -93,6 +93,7 @@ class MuZeroConfig:
 
         # Reanalyze (See paper appendix Reanalyse)
         self.use_reanalyse = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
+        self.all_reanalyse = False
         self.reanalyse_on_gpu = False
         self.reanalyse_num_simulations = 10
         self.target_update_freq = 100

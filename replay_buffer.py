@@ -3,6 +3,7 @@ import time
 import numpy
 import torch
 import models
+import random
 import importlib
 import multiprocessing
 from tqdm import tqdm
@@ -28,6 +29,7 @@ class ReplayBuffer:
         self.reanalyse_worker = reanalyse_worker
         # Fix random generator seed
         numpy.random.seed(self.config.seed)
+        self.counter = 1
 
     def save_game(self, game_history, shared_storage=None):
         if self.config.PER:
@@ -69,11 +71,12 @@ class ReplayBuffer:
     def multi_reanalyse(self, game_datas):
         target_game_datas = []
         for game_data in game_datas:
-            game_id, game_history, game_prob, game_pos, pos_prob = game_data
+            seed, game_id, game_history, game_prob, game_pos, pos_prob = game_data
             if self.config.use_reanalyse:
                 start_index = game_pos
                 end_index = min(game_pos+self.config.num_unroll_steps+self.config.td_steps+1, len(game_history.root_values))
-                target_game_history = self.reanalyse_worker.reanalyse(game_history, start_index, end_index)
+                noise = numpy.random.normal(0,1,[1,32])
+                target_game_history = self.reanalyse_worker.reanalyse(game_history, noise, seed, start_index, end_index)
             else:
                 target_game_history = game_history
             target_game_datas.append((game_id, target_game_history, game_prob, game_pos, pos_prob))
@@ -191,8 +194,11 @@ class ReplayBuffer:
         else:
             selected_games = numpy.random.choice(list(self.buffer.keys()), n_games)
             game_prob_dict = {}
-        ret = [(game_id, self.buffer[game_id], game_prob_dict.get(game_id)) + (self.sample_position(self.buffer[game_id]))
-               for game_id in selected_games]
+        reanalyse_seed = numpy.arange(self.counter, self.counter + self.config.batch_size)
+        self.counter += self.config.batch_size
+
+        ret = [(int(reanalyse_seed[i]), game_id, self.buffer[game_id], game_prob_dict.get(game_id)) + (self.sample_position(self.buffer[game_id]))
+               for i, game_id in enumerate(selected_games)]
 
         return ret
 
@@ -343,15 +349,22 @@ class Reanalyse:
 
         self.num_reanalysed_games = initial_checkpoint["num_reanalysed_games"]
 
-    def reanalyse(self, game_history, start, end):
+    def reanalyse(self, game_history, noise, seed, start, end):
+        setup_seed(seed)
         training_step = self.shared_storage.get_info("training_step")
         if training_step % self.config.target_update_freq == 0:
             self.target_model.set_weights(self.shared_storage.get_info("weights"))
 
         target_game_history = copy.deepcopy(game_history)
-        target_game_history.child_visits[start:] = []
-        target_game_history.root_values[start:] = []
-        target_noise_z = numpy.random.normal(0,1,[1,32])
+        if self.config.all_reanalyse:
+            start = 0
+            end = len(game_history.root_values)
+            target_game_history.child_visits = []
+            target_game_history.root_values = []
+        else:
+            target_game_history.child_visits[start:] = []
+            target_game_history.root_values[start:] = []
+        target_noise_z = noise # numpy.random.normal(0,1,[1,32])
         target_game_history.noise_history = target_noise_z
         for i in range(start, end):
             stacked_observations = target_game_history.get_stacked_observations(
@@ -374,3 +387,9 @@ class Reanalyse:
 
         return target_game_history
 
+def setup_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    numpy.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
