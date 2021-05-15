@@ -1,4 +1,5 @@
 import copy
+import glog
 import importlib
 import math
 import os
@@ -536,7 +537,12 @@ def load_model_menu(muzero, game_name):
 
 
 if __name__ == "__main__":
-    muzero = MuZero('cartpole')
+    try:
+        game = sys.argv[1]
+    except:
+        game = "cartpole"
+    glog.info(f"this is game: {game}")
+    muzero = MuZero(game)
     muzero.train()
     # if len(sys.argv) == 2:
     #     # Train directly with "python muzero.py cartpole"
