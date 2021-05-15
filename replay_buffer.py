@@ -69,6 +69,7 @@ class ReplayBuffer:
         return self.buffer
 
     def multi_reanalyse(self, game_datas):
+        torch.set_num_threads(1)
         target_game_datas = []
         for game_data in game_datas:
             seed, game_id, game_history, game_prob, game_pos, pos_prob = game_data
@@ -100,6 +101,7 @@ class ReplayBuffer:
 
         if self.config.use_multiprocess:
             pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
+            torch.set_num_threads(1)
             for i in range(0, self.config.batch_size, interval):
                 results.append(pool.apply_async(func=self.multi_reanalyse, args=(n_games[i:i+interval],)))
             pool.close()
