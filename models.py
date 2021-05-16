@@ -8,6 +8,7 @@ class MuZeroNetwork:
     def __new__(cls, config):
         if hasattr(config, 'hypermodel'):
             hypermodel = config.hypermodel
+            normalization = config.normalization
         else:
             hypermodel = None
         if config.network == "fullyconnected":
@@ -23,6 +24,7 @@ class MuZeroNetwork:
                 config.fc_dynamics_layers,
                 config.support_size,
                 hypermodel,
+                normalization,
             )
         elif config.network == "resnet":
             return MuZeroResidualNetwork(
@@ -96,6 +98,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         fc_dynamics_layers,
         support_size,
         hypermodel,
+        normalization,
     ):
         super().__init__()
         self.action_space_size = action_space_size
@@ -129,12 +132,13 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         )
 
         self.hypermodel = hypermodel
+        self.normalization = normalization
         if self.hypermodel:
             self.encoding_size = encoding_size
-            self.value_hidden = fc_value_layers[0]
-            weight_inp_dim = 32
-            weight_out_dim = (self.encoding_size + 1) * self.value_hidden + (self.value_hidden + 1) * self.full_support_size
-            self.value_weights = torch.nn.Linear(weight_inp_dim, weight_out_dim)
+            self.hidden_size = fc_value_layers[0]
+            value_params_inp_dim = 32
+            value_params_out_dim = (self.encoding_size + 1) * self.hidden_size + (self.hidden_size + 1) * self.full_support_size
+            self.value_params = torch.nn.Linear(value_params_inp_dim, value_params_out_dim)
         else:
             self.prediction_value_network = torch.nn.DataParallel(
                 mlp(encoding_size, fc_value_layers, self.full_support_size)
@@ -143,12 +147,11 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
     def prediction(self, encoded_state, noise_z):
         policy_logits = self.prediction_policy_network(encoded_state)
         if self.hypermodel:
-            value_weights = self.value_weights(noise_z)
-            w1, b1, w2, b2 = value_weights.split([self.encoding_size*self.value_hidden, self.value_hidden, self.value_hidden*self.full_support_size, self.full_support_size], dim=1)
-            w1 = w1.view(-1, self.encoding_size, self.value_hidden)
-            b1 = b1.view(-1, 1, self.value_hidden)
-            w2 = w2.view(-1, self.value_hidden, self.full_support_size)
-            b2 = b2.view(-1, 1, self.full_support_size)
+            value_params = self.value_params(noise_z)
+            value_params = self.split_params(value_params)
+            if self.normalization:
+                value_params = self.get_norm_params(value_params)  
+            w1, b1, w2, b2 = value_params
             inp = encoded_state.view(-1, 1, self.encoding_size)
             hidden = torch.nn.functional.relu(torch.bmm(inp, w1) + b1)
             out = torch.bmm(hidden, w2) + b2
@@ -222,6 +225,25 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         next_encoded_state, reward = self.dynamics(encoded_state, action)
         policy_logits, value = self.prediction(next_encoded_state, noise_z)
         return value, reward, policy_logits, next_encoded_state
+
+    def split_params(self, value_weights):
+        w1, b1, w2, b2 = value_weights.split([self.encoding_size*self.hidden_size, self.hidden_size, self.hidden_size*self.full_support_size, self.full_support_size], dim=1)
+        w1 = w1.view(-1, self.encoding_size, self.hidden_size)
+        b1 = b1.view(-1, 1, self.hidden_size)
+        w2 = w2.view(-1, self.hidden_size, self.full_support_size)
+        b2 = b2.view(-1, 1, self.full_support_size)
+        return [w1, b1, w2, b2]
+
+    def get_norm_params(self, params):
+        gain = 1.
+        for param in params:
+            if param.shape[1] == 1:
+                continue
+            init_norm = torch.norm(param)
+            target_norm = torch.norm(torch.nn.init.xavier_normal_(
+                torch.empty(size=param.size())))
+            param *= gain * target_norm.detach().numpy() / init_norm.detach().numpy()
+        return params
 
 
 ###### End Fully Connected #######
