@@ -144,12 +144,18 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
                 mlp(encoding_size, fc_value_layers, self.full_support_size)
             )
 
+        if self.normalization:
+            self.init_norm = []
+            self.target_norm = []
+
     def prediction(self, encoded_state, noise_z):
         policy_logits = self.prediction_policy_network(encoded_state)
         if self.hypermodel:
             value_params = self.value_params(noise_z)
             value_params = self.split_params(value_params)
             if self.normalization:
+                if len(self.init_norm) == 0:
+                    self.gen_norm(value_params)
                 value_params = self.get_norm_params(value_params)  
             w1, b1, w2, b2 = value_params
             inp = encoded_state.view(-1, 1, self.encoding_size)
@@ -217,7 +223,6 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             value,
             reward,
             policy_logits,
-
             encoded_state,
         )
 
@@ -236,14 +241,17 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
 
     def get_norm_params(self, params):
         gain = 1.
-        for param in params:
+        for i, param in enumerate(params):
             if param.shape[1] == 1:
                 continue
-            init_norm = torch.norm(param)
-            target_norm = torch.norm(torch.nn.init.xavier_normal_(
-                torch.empty(size=param.size())))
-            param *= gain * target_norm.detach().numpy() / init_norm.detach().numpy()
+            param *= gain * self.target_norm[i] / self.init_norm[i]
         return params
+
+    def gen_norm(self, params):
+        for param in params:
+            self.init_norm.append(torch.norm(param).detach().numpy())
+            self.target_norm.append(torch.norm(torch.nn.init.xavier_normal_(
+                torch.empty(size=param.size()))).detach().numpy())
 
 
 ###### End Fully Connected #######
