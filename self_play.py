@@ -17,15 +17,8 @@ class SelfPlay:
         # Fix random generator seed
         numpy.random.seed(seed)
         torch.manual_seed(seed)
-
-        # Initialize the network
-        # self.model = models.MuZeroNetwork(self.config)
-        # self.model.set_weights(initial_checkpoint["weights"])
-        # self.model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
-        # self.model.eval()
         self.model = model
         
-
     def continuous_self_play(self, shared_storage, replay_buffer, test_mode=False):
         # self.model.set_weights(shared_storage.get_info("weights"))
         self.model.eval()
@@ -51,7 +44,6 @@ class SelfPlay:
                     ),
                 }
             )
-            # print(f"num_games: {shared_storage.get_info('num_played_games')}")
         else:
             # Take the best action (no exploration) in test mode
             game_history = self.play_game(

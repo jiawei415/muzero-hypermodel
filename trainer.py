@@ -17,15 +17,7 @@ class Trainer:
         # Fix random generator seed
         numpy.random.seed(self.config.seed)
         torch.manual_seed(self.config.seed)
-
-        # Initialize the network
-        # self.model = models.MuZeroNetwork(self.config)
-        # self.model.set_weights(copy.deepcopy(initial_checkpoint["weights"]))
-        # self.model.to(torch.device("cuda" if self.config.train_on_gpu else "cpu"))
-        # self.model.train()
-
         self.model = model
-
         self.training_step = initial_checkpoint["training_step"]
 
         if "cuda" not in str(next(self.model.parameters()).device):
@@ -57,9 +49,7 @@ class Trainer:
             )
 
     def continuous_update_weights(self, replay_buffer, shared_storage):
-        # next_batch = replay_buffer.get_batch()
-        # index_batch, batch = (next_batch)
-        # next_batch = replay_buffer.get_batch()
+
         self.model.train()
         index_batch, batch = replay_buffer.get_batch()
         self.update_lr()

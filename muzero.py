@@ -183,8 +183,6 @@ class MuZero:
 
     def train(self, log_in_tensorboard=True):
         self.init_workers(log_in_tensorboard=log_in_tensorboard)
-
-        # while self.shared_storage_worker.get_info('training_step') < self.config.training_steps:
         for counter in range(self.config.episode):
             self.self_play_worker.continuous_self_play(self.shared_storage_worker, self.replay_buffer_worker)
             num_played_games = self.shared_storage_worker.get_info('num_played_games')

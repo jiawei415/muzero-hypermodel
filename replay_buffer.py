@@ -342,11 +342,6 @@ class Reanalyse:
         game_module = importlib.import_module("games." + self.config.game_filename)
         self.game = game_module.Game()
         self.game.env = None
-
-        # Initialize the taget network
-        # self.target_model = models.MuZeroNetwork(self.config)
-        # self.target_model.set_weights(initial_checkpoint["weights"])
-        # self.target_model.to(torch.device("cuda" if self.config.reanalyse_on_gpu else "cpu"))
         self.target_model = target_model
         self.target_model.eval()
 
@@ -354,11 +349,6 @@ class Reanalyse:
 
     def reanalyse(self, game_history, seed, start, end):
         setup_seed(seed)
-        # training_step = self.shared_storage.get_info("training_step")
-        # if training_step % self.config.target_update_freq == 0:
-        #     print(f"update target model")
-        #     self.target_model.set_weights(self.shared_storage.get_info("weights"))
-
         target_game_history = copy.deepcopy(game_history)
         if self.config.all_reanalyse:
             start = 0
