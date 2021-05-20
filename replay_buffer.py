@@ -330,7 +330,7 @@ class Reanalyse:
     See paper appendix Reanalyse.
     """
 
-    def __init__(self, initial_checkpoint, shared_storage, config):
+    def __init__(self, target_model, initial_checkpoint, shared_storage, config):
         self.config = config
         self.shared_storage = shared_storage
 
@@ -344,18 +344,20 @@ class Reanalyse:
         self.game.env = None
 
         # Initialize the taget network
-        self.target_model = models.MuZeroNetwork(self.config)
-        self.target_model.set_weights(initial_checkpoint["weights"])
-        self.target_model.to(torch.device("cuda" if self.config.reanalyse_on_gpu else "cpu"))
+        # self.target_model = models.MuZeroNetwork(self.config)
+        # self.target_model.set_weights(initial_checkpoint["weights"])
+        # self.target_model.to(torch.device("cuda" if self.config.reanalyse_on_gpu else "cpu"))
+        self.target_model = target_model
         self.target_model.eval()
 
         self.num_reanalysed_games = initial_checkpoint["num_reanalysed_games"]
 
     def reanalyse(self, game_history, seed, start, end):
         setup_seed(seed)
-        training_step = self.shared_storage.get_info("training_step")
-        if training_step % self.config.target_update_freq == 0:
-            self.target_model.set_weights(self.shared_storage.get_info("weights"))
+        # training_step = self.shared_storage.get_info("training_step")
+        # if training_step % self.config.target_update_freq == 0:
+        #     print(f"update target model")
+        #     self.target_model.set_weights(self.shared_storage.get_info("weights"))
 
         target_game_history = copy.deepcopy(game_history)
         if self.config.all_reanalyse:

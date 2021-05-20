@@ -10,7 +10,7 @@ class SelfPlay:
     Class which run in a dedicated thread to play games and save them to the replay-buffer.
     """
 
-    def __init__(self, initial_checkpoint, Game, config, seed):
+    def __init__(self, model, initial_checkpoint, Game, config, seed):
         self.config = config
         self.game = Game(seed)
 
@@ -19,13 +19,16 @@ class SelfPlay:
         torch.manual_seed(seed)
 
         # Initialize the network
-        self.model = models.MuZeroNetwork(self.config)
-        self.model.set_weights(initial_checkpoint["weights"])
-        self.model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
-        self.model.eval()
+        # self.model = models.MuZeroNetwork(self.config)
+        # self.model.set_weights(initial_checkpoint["weights"])
+        # self.model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+        # self.model.eval()
+        self.model = model
+        
 
     def continuous_self_play(self, shared_storage, replay_buffer, test_mode=False):
-        self.model.set_weights(shared_storage.get_info("weights"))
+        # self.model.set_weights(shared_storage.get_info("weights"))
+        self.model.eval()
 
         if not test_mode:
             game_history = self.play_game(

@@ -114,9 +114,11 @@ class MuZero:
         self.replay_buffer = {}
 
         cpu_actor = CPUActor()
-        cpu_weights = cpu_actor.get_initial_weights(self.config)
-        self.checkpoint["weights"], self.summary = copy.deepcopy(cpu_weights)
-
+        # cpu_weights = cpu_actor.get_initial_weights(self.config)
+        # self.checkpoint["weights"], self.summary = copy.deepcopy(cpu_weights)
+        weights, summary, self.model, self.target_model = cpu_actor.get_initial_weights(self.config)
+        self.checkpoint["weights"] = copy.deepcopy(weights)
+        self.summary = copy.deepcopy(summary)
         # Workers
         self.self_play_workers = None
         self.test_worker = None
@@ -174,9 +176,9 @@ class MuZero:
         self.shared_storage_worker = shared_storage.SharedStorage(self.checkpoint, self.config)
         self.shared_storage_worker.set_info("terminate", False)
 
-        self.training_worker = trainer.Trainer(self.checkpoint, self.config)
-        self.self_play_worker = self_play.SelfPlay(self.checkpoint, self.Game, self.config, self.config.seed)
-        self.reanalyse_worker = replay_buffer.Reanalyse(self.checkpoint, self.shared_storage_worker, self.config)
+        self.training_worker = trainer.Trainer(self.model, self.checkpoint, self.config)
+        self.self_play_worker = self_play.SelfPlay(self.model, self.checkpoint, self.Game, self.config, self.config.seed)
+        self.reanalyse_worker = replay_buffer.Reanalyse(self.target_model, self.checkpoint, self.shared_storage_worker, self.config)
         self.replay_buffer_worker = replay_buffer.ReplayBuffer(self.checkpoint, self.replay_buffer, self.reanalyse_worker, self.config)
 
     def train(self, log_in_tensorboard=True):
@@ -190,6 +192,10 @@ class MuZero:
                 train_times = self.config.train_times(num_played_games)
                 # for _ in tqdm(range(train_times)):
                 for _ in range(train_times):
+                    training_step = self.shared_storage_worker.get_info("training_step")
+                    if training_step % self.config.target_update_freq == 0:
+                        print(f"update target model")
+                        self.target_model.load_state_dict(self.model.state_dict())
                     self.training_worker.continuous_update_weights(self.replay_buffer_worker, self.shared_storage_worker)
 
             if log_in_tensorboard:
@@ -406,10 +412,16 @@ class CPUActor:
 
     def get_initial_weights(self, config):
         model = models.MuZeroNetwork(config)
+        model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+        target_model = models.MuZeroNetwork(config)
+        target_model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+        target_model.load_state_dict(model.state_dict())
+        target_model.init_norm = model.init_norm
+        target_model.target_norm = model.target_norm
         # print("\n", model)
         weigths = model.get_weights()
         summary = str(model).replace("\n", " \n\n")
-        return weigths, summary
+        return weigths, summary, model, target_model
 
 
 def hyperparameter_search(

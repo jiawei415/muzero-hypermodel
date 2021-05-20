@@ -1,8 +1,6 @@
 import math
-from abc import ABC, abstractmethod
-
 import torch
-
+from abc import ABC, abstractmethod
 
 class MuZeroNetwork:
     def __new__(cls, config):
@@ -156,7 +154,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             if self.normalization:
                 if len(self.init_norm) == 0:
                     self.gen_norm(value_params)
-                value_params = self.get_norm_params(value_params)  
+                value_params = self.get_normal_params(value_params)
             w1, b1, w2, b2 = value_params
             inp = encoded_state.view(-1, 1, self.encoding_size)
             hidden = torch.nn.functional.relu(torch.bmm(inp, w1) + b1)
@@ -239,7 +237,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         b2 = b2.view(-1, 1, self.full_support_size)
         return [w1, b1, w2, b2]
 
-    def get_norm_params(self, params):
+    def get_normal_params(self, params):
         gain = 1.
         for i, param in enumerate(params):
             if param.shape[1] == 1:

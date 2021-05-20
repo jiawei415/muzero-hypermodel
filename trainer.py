@@ -11,7 +11,7 @@ class Trainer:
     in the shared storage.
     """
 
-    def __init__(self, initial_checkpoint, config):
+    def __init__(self, model, initial_checkpoint, config):
         self.config = config
 
         # Fix random generator seed
@@ -19,10 +19,12 @@ class Trainer:
         torch.manual_seed(self.config.seed)
 
         # Initialize the network
-        self.model = models.MuZeroNetwork(self.config)
-        self.model.set_weights(copy.deepcopy(initial_checkpoint["weights"]))
-        self.model.to(torch.device("cuda" if self.config.train_on_gpu else "cpu"))
-        self.model.train()
+        # self.model = models.MuZeroNetwork(self.config)
+        # self.model.set_weights(copy.deepcopy(initial_checkpoint["weights"]))
+        # self.model.to(torch.device("cuda" if self.config.train_on_gpu else "cpu"))
+        # self.model.train()
+
+        self.model = model
 
         self.training_step = initial_checkpoint["training_step"]
 
@@ -58,6 +60,7 @@ class Trainer:
         # next_batch = replay_buffer.get_batch()
         # index_batch, batch = (next_batch)
         # next_batch = replay_buffer.get_batch()
+        self.model.train()
         index_batch, batch = replay_buffer.get_batch()
         self.update_lr()
         (
