@@ -416,8 +416,9 @@ class CPUActor:
         target_model = models.MuZeroNetwork(config)
         target_model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
         target_model.load_state_dict(model.state_dict())
-        target_model.init_norm = model.init_norm
-        target_model.target_norm = model.target_norm
+        if config.normalization:
+            target_model.init_norm = model.init_norm
+            target_model.target_norm = model.target_norm
         # print("\n", model)
         weigths = model.get_weights()
         summary = str(model).replace("\n", " \n\n")
