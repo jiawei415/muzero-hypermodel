@@ -101,6 +101,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         super().__init__()
         self.action_space_size = action_space_size
         self.full_support_size = 2 * support_size + 1
+        self.value_hyper, self.reward_hyper, self.state_hyper = hypermodel
 
         self.representation_network = torch.nn.DataParallel(
             mlp(
@@ -113,53 +114,80 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
                 encoding_size,
             )
         )
-
-        self.dynamics_encoded_state_network = torch.nn.DataParallel(
-            mlp(
-                encoding_size + self.action_space_size,
-                fc_dynamics_layers,
-                encoding_size,
+        if self.state_hyper:
+            print(f"use dynamics state hypermodel!")
+            layers = [encoding_size + self.action_space_size] + fc_dynamics_layers + [encoding_size]
+            self.state_shapes = []
+            self.state_sizes = []
+            for i in range(len(layers)-1):
+                self.state_shapes.extend([(layers[i], layers[i+1]), (1, layers[i+1])])
+                self.state_sizes.extend([layers[i] * layers[i+1], layers[i+1]])
+            state_params_inp_dim = 32
+            state_params_out_dim = sum(self.state_sizes)
+            self.state_params = torch.nn.Linear(state_params_inp_dim, state_params_out_dim)
+        else:
+            self.dynamics_encoded_state_network = torch.nn.DataParallel(
+                mlp(
+                    encoding_size + self.action_space_size,
+                    fc_dynamics_layers,
+                    encoding_size,
+                )
             )
-        )
-        self.dynamics_reward_network = torch.nn.DataParallel(
-            mlp(encoding_size, fc_reward_layers, self.full_support_size)
-        )
+        
+        if self.reward_hyper:
+            print(f"use dynamics reward hypermodel!")
+            layers = [encoding_size] + fc_reward_layers + [self.full_support_size]
+            self.reward_shapes = []
+            self.reward_sizes = []
+            for i in range(len(layers)-1):
+                self.reward_shapes.extend([(layers[i], layers[i+1]), (1, layers[i+1])])
+                self.reward_sizes.extend([layers[i] * layers[i+1], layers[i+1]])
+            reward_params_inp_dim = 32
+            reward_params_out_dim = sum(self.reward_sizes)
+            self.reward_params = torch.nn.Linear(reward_params_inp_dim, reward_params_out_dim)
+        else:
+            self.dynamics_reward_network = torch.nn.DataParallel(
+                mlp(encoding_size, fc_reward_layers, self.full_support_size)
+            )
 
         self.prediction_policy_network = torch.nn.DataParallel(
             mlp(encoding_size, fc_policy_layers, self.action_space_size)
         )
 
-        self.hypermodel = hypermodel
-        self.normalization = normalization
-        if self.hypermodel:
-            self.encoding_size = encoding_size
-            self.hidden_size = fc_value_layers[0]
+        if self.value_hyper:
+            print(f"use prediction state hypermodel!")
+            layers = [encoding_size] + fc_value_layers + [self.full_support_size]
+            self.value_shapes = []
+            self.value_sizes = []
+            for i in range(len(layers)-1):
+                self.value_shapes.extend([(layers[i], layers[i+1]), (1, layers[i+1])])
+                self.value_sizes.extend([layers[i] * layers[i+1], layers[i+1]])
             value_params_inp_dim = 32
-            value_params_out_dim = (self.encoding_size + 1) * self.hidden_size + (self.hidden_size + 1) * self.full_support_size
+            value_params_out_dim = sum(self.value_sizes)
             self.value_params = torch.nn.Linear(value_params_inp_dim, value_params_out_dim)
         else:
             self.prediction_value_network = torch.nn.DataParallel(
                 mlp(encoding_size, fc_value_layers, self.full_support_size)
             )
-
+        
+        self.normalization = normalization
         if self.normalization:
             self.init_norm = []
             self.target_norm = []
 
     def prediction(self, encoded_state, noise_z):
         policy_logits = self.prediction_policy_network(encoded_state)
-        if self.hypermodel:
+        if self.value_hyper:
             value_params = self.value_params(noise_z)
             value_params = self.split_params(value_params)
             if self.normalization:
                 if len(self.init_norm) == 0:
                     self.gen_norm(value_params)
                 value_params = self.get_normal_params(value_params)
-            w1, b1, w2, b2 = value_params
-            inp = encoded_state.view(-1, 1, self.encoding_size)
-            hidden = torch.nn.functional.relu(torch.bmm(inp, w1) + b1)
-            out = torch.bmm(hidden, w2) + b2
-            value = out.squeeze(dim=1)
+            inp = encoded_state.unsqueeze(dim=1)
+            for i in range(0, len(value_params), 2):
+                inp = torch.nn.functional.relu(torch.bmm(inp, value_params[i]) + value_params[i+1])
+            value = inp.squeeze(dim=1)
         else:
             value = self.prediction_value_network(encoded_state)
 
@@ -179,7 +207,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         ) / scale_encoded_state
         return encoded_state_normalized
 
-    def dynamics(self, encoded_state, action):
+    def dynamics(self, encoded_state, action, noise_z):
         # Stack encoded_state with a game specific one hot encoded action (See paper appendix Network Architecture)
         action_one_hot = (
             torch.zeros((action.shape[0], self.action_space_size))
@@ -189,9 +217,33 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         action_one_hot.scatter_(1, action.long(), 1.0)
         x = torch.cat((encoded_state, action_one_hot), dim=1)
 
-        next_encoded_state = self.dynamics_encoded_state_network(x)
+        if self.state_hyper:
+            state_params = self.state_params(noise_z)
+            state_params = self.split_params(state_params)
+            if self.normalization:
+                if len(self.init_norm) == 0:
+                    self.gen_norm(state_params)
+                state_params = self.get_normal_params(state_params)
+            inp = x.unsqueeze(dim=1)
+            for i in range(0, len(state_params), 2):
+                inp = torch.nn.functional.relu(torch.bmm(inp, state_params[i]) + state_params[i+1])
+            next_encoded_state = inp.squeeze(dim=1)
+        else:
+            next_encoded_state = self.dynamics_encoded_state_network(x)
 
-        reward = self.dynamics_reward_network(next_encoded_state)
+        if self.reward_hyper:
+            reward_params = self.reward_params(noise_z)
+            reward_params = self.split_params(reward_params)
+            if self.normalization:
+                if len(self.init_norm) == 0:
+                    self.gen_norm(reward_params)
+                reward_params = self.get_normal_params(reward_params)
+            inp = next_encoded_state.unsqueeze(dim=1)
+            for i in range(0, len(reward_params), 2):
+                inp = torch.nn.functional.relu(torch.bmm(inp, reward_params[i]) + reward_params[i+1])
+            reward = inp.squeeze(dim=1)
+        else:
+            reward = self.dynamics_reward_network(next_encoded_state)
 
         # Scale encoded state between [0, 1] (See paper appendix Training)
         min_next_encoded_state = next_encoded_state.min(1, keepdim=True)[0]
@@ -225,17 +277,25 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         )
 
     def recurrent_inference(self, encoded_state, action, noise_z):
-        next_encoded_state, reward = self.dynamics(encoded_state, action)
+        next_encoded_state, reward = self.dynamics(encoded_state, action, noise_z)
         policy_logits, value = self.prediction(next_encoded_state, noise_z)
         return value, reward, policy_logits, next_encoded_state
 
-    def split_params(self, value_weights):
-        w1, b1, w2, b2 = value_weights.split([self.encoding_size*self.hidden_size, self.hidden_size, self.hidden_size*self.full_support_size, self.full_support_size], dim=1)
-        w1 = w1.view(-1, self.encoding_size, self.hidden_size)
-        b1 = b1.view(-1, 1, self.hidden_size)
-        w2 = w2.view(-1, self.hidden_size, self.full_support_size)
-        b2 = b2.view(-1, 1, self.full_support_size)
-        return [w1, b1, w2, b2]
+    def split_params(self, params):
+        if self.reward_hyper:
+            sizes = self.reward_sizes
+            shapes = self.reward_shapes
+        elif self.state_hyper:
+            sizes = self.state_sizes
+            shapes = self.state_shapes
+        elif self.value_hyper:
+            sizes = self.value_sizes
+            shapes = self.value_shapes
+        params = params.split(sizes, dim=1)
+        params_splited = []
+        for param, shape in zip(params, shapes):
+            params_splited.append(param.reshape((-1,) + shape))
+        return params_splited
 
     def get_normal_params(self, params):
         gain = 1.
