@@ -46,6 +46,7 @@ class MuZeroConfig:
         self.network = "fullyconnected"  # "resnet" / "fullyconnected"
         self.support_size = 10  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size. Choose it so that support_size <= sqrt(max(abs(discounted reward)))
         self.hypermodel = False
+        self.normalization = False
 
         # Residual Network
         self.downsample = False  # Downsample observations before representation network, False / "CNN" (lighter) / "resnet" (See paper appendix Network Architecture)
@@ -304,7 +305,7 @@ class CartPoleHard(gym.Env):
         '''
         ################################################
         ''' Hard '''
-        done = bool(abs(x) > self.x_threshold or abs(theta) > self.theta_threshold_radians)
+        done = False # bool(abs(x) > self.x_threshold or abs(theta) > self.theta_threshold_radians)
         if not done:
             if abs(math.cos(theta)) > 0.95 and abs(x) < 0.1 and abs(theta_dot) < 1 and abs(x_dot) < 1:
                 reward = 1.0
