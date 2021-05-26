@@ -186,7 +186,9 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
                 value_params = self.get_normal_params(value_params)
             inp = encoded_state.unsqueeze(dim=1)
             for i in range(0, len(value_params), 2):
-                inp = torch.nn.functional.relu(torch.bmm(inp, value_params[i]) + value_params[i+1])
+                inp = torch.bmm(inp, value_params[i]) + value_params[i+1]
+                if i != len(value_params) - 2:
+                    inp = torch.nn.functional.relu(inp)
             value = inp.squeeze(dim=1)
         else:
             value = self.prediction_value_network(encoded_state)
@@ -226,7 +228,9 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
                 state_params = self.get_normal_params(state_params)
             inp = x.unsqueeze(dim=1)
             for i in range(0, len(state_params), 2):
-                inp = torch.nn.functional.relu(torch.bmm(inp, state_params[i]) + state_params[i+1])
+                inp = torch.bmm(inp, state_params[i]) + state_params[i+1]
+                if i != len(state_params) - 2:
+                    inp = torch.nn.functional.relu(inp)
             next_encoded_state = inp.squeeze(dim=1)
         else:
             next_encoded_state = self.dynamics_encoded_state_network(x)
@@ -240,7 +244,9 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
                 reward_params = self.get_normal_params(reward_params)
             inp = next_encoded_state.unsqueeze(dim=1)
             for i in range(0, len(reward_params), 2):
-                inp = torch.nn.functional.relu(torch.bmm(inp, reward_params[i]) + reward_params[i+1])
+                inp = torch.bmm(inp, reward_params[i]) + reward_params[i+1]
+                if i != len(reward_params) - 2:
+                    inp = torch.nn.functional.relu(inp)
             reward = inp.squeeze(dim=1)
         else:
             reward = self.dynamics_reward_network(next_encoded_state)
