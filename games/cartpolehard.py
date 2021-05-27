@@ -68,7 +68,7 @@ class MuZeroConfig:
         self.fc_policy_layers = [16]  # Define the hidden layers in the policy network
 
         ### Training
-        self.results_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../results", os.path.basename(__file__)[:-3] + "_" + datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S"))  # Path to store the model weights and TensorBoard logs
+        self.results_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../results", os.path.basename(__file__)[:-3] + "_" + datetime.datetime.now().strftime("%Y%m%d%H%M%S"))  # Path to store the model weights and TensorBoard logs
         self.save_model = True  # Save the checkpoint in results_path as model.checkpoint
         self.training_steps = 10000  # Total number of training steps (ie weights update according to a batch)
         self.batch_size = 128  # Number of parts of games to train on at each training step
@@ -234,7 +234,7 @@ class CartPoleHard(gym.Env):
         '''
         #################################################
         '''Hard'''
-        self.theta_threshold_radians = 90 * 2 * math.pi / 360  
+        self.theta_threshold_radians = 90 * 2 * math.pi / 360
         '''Hard'''
         self.x_threshold = 2.4
         # Angle limit set to 2 * theta_threshold_radians so failing observation
@@ -286,7 +286,7 @@ class CartPoleHard(gym.Env):
             theta = theta + self.tau * theta_dot
 
         self.state = (x, x_dot, theta, theta_dot)
-        
+
         '''
         Original
         done = bool(
