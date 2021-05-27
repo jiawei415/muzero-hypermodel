@@ -46,8 +46,8 @@ class MuZeroConfig:
         ### Network
         self.network = "fullyconnected"  # "resnet" / "fullyconnected"
         self.support_size = 10  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size. Choose it so that support_size <= sqrt(max(abs(discounted reward)))
-        self.hypermodel = [False, False, False] # value_hyper; reward_hyper; state_hyper; only set one true
-        self.normalization = False
+        self.hypermodel = [0, 0, 0] # value_hyper; reward_hyper; state_hyper;
+        self.normalization = [0, 0, 0] # value_normalization; reward_normalization; state_normalization;
 
         # Residual Network
         self.downsample = False  # Downsample observations before representation network, False / "CNN" (lighter) / "resnet" (See paper appendix Network Architecture)
@@ -99,7 +99,7 @@ class MuZeroConfig:
         self.reanalyse_on_gpu = False
         self.reanalyse_num_simulations = 10
         self.target_update_freq = 100
-        self.num_process = 8
+        self.num_process = 32
         self.use_multiprocess = True
 
         ### Adjust the self play / training ratio to avoid over/underfitting
