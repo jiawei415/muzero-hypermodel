@@ -137,7 +137,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
                     encoding_size,
                 )
             )
-        
+
         if self.reward_hyper:
             print(f"use dynamics reward hypermodel!")
             layers = [encoding_size] + fc_reward_layers + [self.full_support_size]
@@ -162,7 +162,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         )
 
         if self.value_hyper:
-            print(f"use prediction state hypermodel!")
+            print(f"use prediction value hypermodel!")
             layers = [encoding_size] + fc_value_layers + [self.full_support_size]
             self.value_shapes = []
             self.value_sizes = []
