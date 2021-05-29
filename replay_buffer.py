@@ -344,6 +344,7 @@ class Reanalyse:
         self.game.env = None
         self.target_model = target_model
         self.target_model.eval()
+        self.noise_dim = int(self.config.hyper_inp_dim)
 
         self.num_reanalysed_games = initial_checkpoint["num_reanalysed_games"]
 
@@ -358,7 +359,7 @@ class Reanalyse:
         else:
             target_game_history.child_visits[start:] = []
             target_game_history.root_values[start:] = []
-        target_noise_z = numpy.random.normal(0,1,[1,32])
+        target_noise_z = numpy.random.normal(0, 1, [1, self.noise_dim])
         target_game_history.noise_history = target_noise_z
         for i in range(start, end):
             stacked_observations = target_game_history.get_stacked_observations(

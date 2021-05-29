@@ -18,6 +18,7 @@ class SelfPlay:
         numpy.random.seed(seed)
         torch.manual_seed(seed)
         self.model = model
+        self.noise_dim = int(self.config.hyper_inp_dim)
         
     def continuous_self_play(self, shared_storage, replay_buffer, test_mode=False):
         # self.model.set_weights(shared_storage.get_info("weights"))
@@ -90,7 +91,7 @@ class SelfPlay:
         """
         game_history = GameHistory()
         observation = self.game.reset()
-        noise_z = numpy.random.normal(0,1,[1,32])
+        noise_z = numpy.random.normal(0, 1, [1, self.noise_dim])
         game_history.noise_history = noise_z
         game_history.action_history.append(0)
         game_history.observation_history.append(observation)
