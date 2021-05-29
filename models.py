@@ -7,6 +7,7 @@ class MuZeroNetwork:
         if hasattr(config, 'hypermodel'):
             hypermodel = config.hypermodel
             normalization = config.normalization
+            hyper_inp_dim = config.hyper_inp_dim
         else:
             hypermodel = None
         if config.network == "fullyconnected":
@@ -22,6 +23,7 @@ class MuZeroNetwork:
                 config.fc_dynamics_layers,
                 config.support_size,
                 hypermodel,
+                hyper_inp_dim,
                 normalization,
             )
         elif config.network == "resnet":
@@ -96,6 +98,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         fc_dynamics_layers,
         support_size,
         hypermodel,
+        hyper_inp_dim,
         normalization,
     ):
         super().__init__()
@@ -123,7 +126,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             for i in range(len(layers)-1):
                 self.state_shapes.extend([(layers[i], layers[i+1]), (1, layers[i+1])])
                 self.state_sizes.extend([layers[i] * layers[i+1], layers[i+1]])
-            state_params_inp_dim = 32
+            state_params_inp_dim = hyper_inp_dim
             state_params_out_dim = sum(self.state_sizes)
             self.state_params = torch.nn.Linear(state_params_inp_dim, state_params_out_dim)
             if self.state_normal:
@@ -146,7 +149,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             for i in range(len(layers)-1):
                 self.reward_shapes.extend([(layers[i], layers[i+1]), (1, layers[i+1])])
                 self.reward_sizes.extend([layers[i] * layers[i+1], layers[i+1]])
-            reward_params_inp_dim = 32
+            reward_params_inp_dim = hyper_inp_dim
             reward_params_out_dim = sum(self.reward_sizes)
             self.reward_params = torch.nn.Linear(reward_params_inp_dim, reward_params_out_dim)
             if self.reward_normal:
@@ -169,7 +172,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             for i in range(len(layers)-1):
                 self.value_shapes.extend([(layers[i], layers[i+1]), (1, layers[i+1])])
                 self.value_sizes.extend([layers[i] * layers[i+1], layers[i+1]])
-            value_params_inp_dim = 32
+            value_params_inp_dim = hyper_inp_dim
             value_params_out_dim = sum(self.value_sizes)
             self.value_params = torch.nn.Linear(value_params_inp_dim, value_params_out_dim)
             if self.value_normal:
