@@ -11,13 +11,14 @@ class Trainer:
     in the shared storage.
     """
 
-    def __init__(self, model, initial_checkpoint, config):
+    def __init__(self, model, initial_checkpoint, config, writer):
         self.config = config
 
         # Fix random generator seed
         numpy.random.seed(self.config.seed)
         torch.manual_seed(self.config.seed)
         self.model = model
+        self.writer = writer
         self.training_step = initial_checkpoint["training_step"]
 
         if "cuda" not in str(next(self.model.parameters()).device):
@@ -60,6 +61,13 @@ class Trainer:
             reward_loss,
             policy_loss,
         ) = self.update_weights(batch)
+
+        for i, (name, param) in enumerate(self.model.named_parameters()):
+            print(f"name {name}")
+            self.writer.add_histogram(f"1.Model/{i}.{name}", param, 0)
+            self.writer.add_scalar(
+                f"4.Variance/{i}.{name}", torch.std(param), self.training_step,
+            )
 
         if self.config.PER:
             # Save new priorities in the replay buffer (See https://arxiv.org/abs/1803.00933)

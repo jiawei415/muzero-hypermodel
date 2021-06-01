@@ -174,7 +174,7 @@ class MuZero:
         self.shared_storage_worker = shared_storage.SharedStorage(self.checkpoint, self.config)
         self.shared_storage_worker.set_info("terminate", False)
 
-        self.training_worker = trainer.Trainer(self.model, self.checkpoint, self.config)
+        self.training_worker = trainer.Trainer(self.model, self.checkpoint, self.config, self.writer)
         self.self_play_worker = self_play.SelfPlay(self.model, self.checkpoint, self.Game, self.config, self.config.seed)
         self.reanalyse_worker = replay_buffer.Reanalyse(self.target_model, self.checkpoint, self.shared_storage_worker, self.config)
         self.replay_buffer_worker = replay_buffer.ReplayBuffer(self.checkpoint, self.replay_buffer, self.reanalyse_worker, self.config)

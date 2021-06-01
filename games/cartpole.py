@@ -46,7 +46,7 @@ class MuZeroConfig:
         self.network = "fullyconnected"  # "resnet" / "fullyconnected"
         self.support_size = 10  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size. Choose it so that support_size <= sqrt(max(abs(discounted reward)))
         self.hypermodel = [1, 1, 0] # value_hyper; reward_hyper; state_hyper;
-        self.normalization = [1, 1, 0] # value_normalization; reward_normalization; state_normalization;
+        self.normalization = [0, 0, 0] # value_normalization; reward_normalization; state_normalization;
         self.hyper_inp_dim = 32
 
         # Residual Network
@@ -94,7 +94,7 @@ class MuZeroConfig:
         self.PER_alpha = 0.5  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
 
         # Reanalyze (See paper appendix Reanalyse)
-        self.use_reanalyse = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
+        self.use_reanalyse = False  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
         self.all_reanalyse = False
         self.reanalyse_on_gpu = False
         self.reanalyse_num_simulations = 10
