@@ -190,7 +190,7 @@ class MuZero:
                 for _ in range(train_times):
                     training_step = self.shared_storage_worker.get_info("training_step")
                     if training_step % self.config.target_update_freq == 0:
-                        print(f"update target model")
+                        # print(f"update target model")
                         self.target_model.load_state_dict(self.model.state_dict())
                     self.training_worker.continuous_update_weights(self.replay_buffer_worker, self.shared_storage_worker)
 
