@@ -187,21 +187,22 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         policy_logits = self.prediction_policy_network(encoded_state)
         if self.value_hyper:
             value_params = self.value_params(noise_z)
-            value_params = self.split_params(value_params, "value")
+            split_params = self.split_params(value_params, "value")
             if self.value_normal:
                 if len(self.init_value_norm) == 0:
-                    self.gen_norm(value_params, "value")
-                value_params = self.get_normal_params(value_params, "value")
+                    self.gen_norm(split_params, "value")
+                split_params = self.get_normal_params(split_params, "value")
             inp = encoded_state.unsqueeze(dim=1)
-            for i in range(0, len(value_params), 2):
-                inp = torch.bmm(inp, value_params[i]) + value_params[i+1]
-                if i != len(value_params) - 2:
+            for i in range(0, len(split_params), 2):
+                inp = torch.bmm(inp, split_params[i]) + split_params[i+1]
+                if i != len(split_params) - 2:
                     inp = torch.nn.functional.relu(inp)
             value = inp.squeeze(dim=1)
         else:
             value = self.prediction_value_network(encoded_state)
-
-        return policy_logits, value
+            value_params = None
+        return policy_logits, value, value_params
+ 
 
     def representation(self, observation):
         encoded_state = self.representation_network(
@@ -229,35 +230,37 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
 
         if self.state_hyper:
             state_params = self.state_params(noise_z)
-            state_params = self.split_params(state_params, "state")
+            split_params = self.split_params(state_params, "state")
             if self.state_normal:
                 if len(self.init_state_norm) == 0:
-                    self.gen_norm(state_params, "state")
-                state_params = self.get_normal_params(state_params, "state")
+                    self.gen_norm(split_params, "state")
+                split_params = self.get_normal_params(split_params, "state")
             inp = x.unsqueeze(dim=1)
-            for i in range(0, len(state_params), 2):
-                inp = torch.bmm(inp, state_params[i]) + state_params[i+1]
-                if i != len(state_params) - 2:
+            for i in range(0, len(split_params), 2):
+                inp = torch.bmm(inp, split_params[i]) + split_params[i+1]
+                if i != len(split_params) - 2:
                     inp = torch.nn.functional.relu(inp)
             next_encoded_state = inp.squeeze(dim=1)
         else:
             next_encoded_state = self.dynamics_encoded_state_network(x)
+            state_params = None
 
         if self.reward_hyper:
             reward_params = self.reward_params(noise_z)
-            reward_params = self.split_params(reward_params, "reward")
+            split_params = self.split_params(reward_params, "reward")
             if self.reward_normal:
                 if len(self.init_reward_norm) == 0:
-                    self.gen_norm(reward_params, "reward")
-                reward_params = self.get_normal_params(reward_params, "reward")
+                    self.gen_norm(split_params, "reward")
+                split_params = self.get_normal_params(split_params, "reward")
             inp = next_encoded_state.unsqueeze(dim=1)
-            for i in range(0, len(reward_params), 2):
-                inp = torch.bmm(inp, reward_params[i]) + reward_params[i+1]
-                if i != len(reward_params) - 2:
+            for i in range(0, len(split_params), 2):
+                inp = torch.bmm(inp, split_params[i]) + split_params[i+1]
+                if i != len(split_params) - 2:
                     inp = torch.nn.functional.relu(inp)
             reward = inp.squeeze(dim=1)
         else:
             reward = self.dynamics_reward_network(next_encoded_state)
+            reward_params = None
 
         # Scale encoded state between [0, 1] (See paper appendix Training)
         min_next_encoded_state = next_encoded_state.min(1, keepdim=True)[0]
@@ -268,11 +271,11 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             next_encoded_state - min_next_encoded_state
         ) / scale_next_encoded_state
 
-        return next_encoded_state_normalized, reward
+        return next_encoded_state_normalized, reward, state_params, reward_params
 
     def initial_inference(self, observation, noise_z):
         encoded_state = self.representation(observation)
-        policy_logits, value = self.prediction(encoded_state, noise_z)
+        policy_logits, value, value_params = self.prediction(encoded_state, noise_z)
         # reward equal to 0 for consistency
         reward = torch.log(
             (
@@ -288,12 +291,13 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             reward,
             policy_logits,
             encoded_state,
+            value_params,
         )
 
     def recurrent_inference(self, encoded_state, action, noise_z):
-        next_encoded_state, reward = self.dynamics(encoded_state, action, noise_z)
-        policy_logits, value = self.prediction(next_encoded_state, noise_z)
-        return value, reward, policy_logits, next_encoded_state
+        next_encoded_state, reward, state_params, reward_params = self.dynamics(encoded_state, action, noise_z)
+        policy_logits, value, value_params = self.prediction(next_encoded_state, noise_z)
+        return value, reward, policy_logits, next_encoded_state, value_params, state_params, reward_params
 
     def split_params(self, params, hyper_type):
         if hyper_type == "reward":

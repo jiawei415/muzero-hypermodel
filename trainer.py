@@ -63,10 +63,9 @@ class Trainer:
         ) = self.update_weights(batch)
 
         for i, (name, param) in enumerate(self.model.named_parameters()):
-            print(f"name {name}")
-            self.writer.add_histogram(f"1.Model/{i}.{name}", param, 0)
+            self.writer.add_histogram(f"1.Model/{name}", param, 0)
             self.writer.add_scalar(
-                f"4.Variance/{i}.{name}", torch.std(param), self.training_step,
+                f"4.Variance/{name}", torch.std(param), self.training_step,
             )
 
         if self.config.PER:
@@ -142,12 +141,17 @@ class Trainer:
         # target_reward: batch, num_unroll_steps+1, 2*support_size+1
 
         ## Generate predictions
-        value, reward, policy_logits, hidden_state = self.model.initial_inference(
+        value, reward, policy_logits, hidden_state, value_params = self.model.initial_inference(
             observation_batch, noise_batch[:, 0]
         )
+        if value_params is not None:
+            self.writer.add_histogram(f"2.Hypermodel/value_params", value_params, 0)
+            self.writer.add_scalar(
+                f"4.Variance/value_params", torch.std(value_params), self.training_step,
+            )
         predictions = [(value, reward, policy_logits)]
         for i in range(1, action_batch.shape[1]):
-            value, reward, policy_logits, hidden_state = self.model.recurrent_inference(
+            value, reward, policy_logits, hidden_state, value_params, state_params, reward_params = self.model.recurrent_inference(
                 hidden_state, action_batch[:, i], noise_batch[:, i]
             )
             # Scale the gradient at the start of the dynamics function (See paper appendix Training)
@@ -155,6 +159,16 @@ class Trainer:
             predictions.append((value, reward, policy_logits))
         # predictions: num_unroll_steps+1, 3, batch, 2*support_size+1 | 2*support_size+1 | 9 (according to the 2nd dim)
 
+        if state_params is not None:
+            self.writer.add_histogram(f"2.Hypermodel/state_params", state_params, 0)
+            self.writer.add_scalar(
+                f"4.Variance/state_params", torch.std(state_params), self.training_step,
+            )
+        if reward_params is not None:
+            self.writer.add_histogram(f"2.Hypermodel/reward_params", reward_params, 0)
+            self.writer.add_scalar(
+                f"4.Variance/reward_params", torch.std(reward_params), self.training_step,
+            )
         ## Compute losses
         value_loss, reward_loss, policy_loss = (0, 0, 0)
         value, reward, policy_logits = predictions[0]
