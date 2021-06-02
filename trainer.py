@@ -256,10 +256,11 @@ class Trainer:
                 ** self.config.PER_alpha
             )
 
-        reg_loss = self.regularization_loss([value_params, reward_params, reward_params])
-        
         # Scale the value loss, paper recommends by 0.25 (See paper appendix Reanalyze)
-        loss = value_loss * self.config.value_loss_weight + reward_loss + policy_loss + reg_loss
+        loss = value_loss * self.config.value_loss_weight + reward_loss + policy_loss
+        if self.config.regularization:
+            reg_loss = self.regularization_loss([value_params, reward_params, reward_params])
+            loss += reg_loss
         if self.config.PER:
             # Correct PER bias by using importance-sampling (IS) weights
             loss *= weight_batch

@@ -48,6 +48,7 @@ class MuZeroConfig:
         self.support_size = 10  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size. Choose it so that support_size <= sqrt(max(abs(discounted reward)))
         self.hypermodel = [0, 0, 0] # value_hyper; reward_hyper; state_hyper;
         self.normalization = [0, 0, 0] # value_normalization; reward_normalization; state_normalization;
+        self.regularization = True
         self.hyper_inp_dim = 32
 
         # Residual Network
