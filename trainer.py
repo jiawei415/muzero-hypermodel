@@ -62,11 +62,14 @@ class Trainer:
             policy_loss,
         ) = self.update_weights(batch)
 
-        for i, (name, param) in enumerate(self.model.named_parameters()):
-            self.writer.add_histogram(f"1.Model/{name}", param, 0)
-            self.writer.add_scalar(
-                f"4.Variance/{name}", torch.std(param), self.training_step,
-            )
+        if self.training_step % 50 == 0:
+            for i, (name, param) in enumerate(self.model.named_parameters()):
+                if "bias" in name:
+                    continue
+                self.writer.add_histogram(f"1.Model/{name}", param, 0)
+                self.writer.add_scalar(
+                    f"4.Variance/{name}", torch.std(param), self.training_step,
+                )
 
         if self.config.PER:
             # Save new priorities in the replay buffer (See https://arxiv.org/abs/1803.00933)
@@ -147,7 +150,7 @@ class Trainer:
         )
         value_scalar.append(models.support_to_scalar(value, self.config.support_size))
         reward_scalar.append(models.support_to_scalar(reward, self.config.support_size))
-        if value_params is not None:
+        if value_params is not None and self.training_step % 50 == 0:
             self.writer.add_histogram(f"2.Hypermodel/value_params", value_params, 0)
             self.writer.add_scalar(
                 f"4.Variance/value_params", torch.std(value_params), self.training_step,
@@ -163,24 +166,25 @@ class Trainer:
             hidden_state.register_hook(lambda grad: grad * 0.5)
             predictions.append((value, reward, policy_logits))
         # predictions: num_unroll_steps+1, 3, batch, 2*support_size+1 | 2*support_size+1 | 9 (according to the 2nd dim)
-        if state_params is not None:
+        if state_params is not None and self.training_step % 50 == 0:
             self.writer.add_histogram(f"2.Hypermodel/state_params", state_params, 0)
             self.writer.add_scalar(
                 f"4.Variance/state_params", torch.std(state_params), self.training_step,
             )
-        if reward_params is not None:
+        if reward_params is not None and self.training_step % 50 == 0:
             self.writer.add_histogram(f"2.Hypermodel/reward_params", reward_params, 0)
             self.writer.add_scalar(
                 f"4.Variance/reward_params", torch.std(reward_params), self.training_step,
             )
         value_scalar = torch.cat(value_scalar, dim=1)
         reward_scalar = torch.cat(reward_scalar, dim=1)
-        self.writer.add_scalar(
-                f"4.Variance/value", torch.std(value_scalar), self.training_step,
-            )
-        self.writer.add_scalar(
-                f"4.Variance/reward", torch.std(reward_scalar), self.training_step,
-            )
+        if self.training_step % 50 == 0:
+            self.writer.add_scalar(
+                    f"4.Variance/value", torch.std(value_scalar), self.training_step,
+                )
+            self.writer.add_scalar(
+                    f"4.Variance/reward", torch.std(reward_scalar), self.training_step,
+                )
 
         ## Compute losses
         value_loss, reward_loss, policy_loss = (0, 0, 0)
