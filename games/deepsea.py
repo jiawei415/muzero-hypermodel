@@ -25,7 +25,8 @@ class MuZeroConfig:
         self.size = 20
 
         # Fully Connected Network
-        self.stacked_observations = 0  
+        self.stacked_observations = 0
+        self.use_representation = True
         self.encoding_size = 8
         self.fc_representation_layers = []  # Define the hidden layers in the representation network
         self.fc_dynamics_layers = [16]  # Define the hidden layers in the dynamics network

@@ -25,6 +25,7 @@ class MuZeroNetwork:
                 hypermodel,
                 hyper_inp_dim,
                 normalization,
+                config,
             )
         elif config.network == "resnet":
             return MuZeroResidualNetwork(
@@ -100,24 +101,30 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         hypermodel,
         hyper_inp_dim,
         normalization,
+        config,
     ):
         super().__init__()
         self.action_space_size = action_space_size
         self.full_support_size = 2 * support_size + 1
         self.value_hyper, self.reward_hyper, self.state_hyper = hypermodel
         self.value_normal, self.reward_normal, self.state_normal = normalization
+        self.config = config
 
-        self.representation_network = torch.nn.DataParallel(
-            mlp(
-                observation_shape[0]
-                * observation_shape[1]
-                * observation_shape[2]
-                * (stacked_observations + 1)
-                + stacked_observations * observation_shape[1] * observation_shape[2],
-                fc_representation_layers,
-                encoding_size,
+        if not self.config.use_representation and self.config.stacked_observations == 0:
+            encoding_size = self.config.observation_shape[-1]
+        else:
+            self.representation_network = torch.nn.DataParallel(
+                mlp(
+                    observation_shape[0]
+                    * observation_shape[1]
+                    * observation_shape[2]
+                    * (stacked_observations + 1)
+                    + stacked_observations * observation_shape[1] * observation_shape[2],
+                    fc_representation_layers,
+                    encoding_size,
+                )
             )
-        )
+            
         if self.state_hyper:
             print(f"use dynamics state hypermodel!")
             layers = [encoding_size + self.action_space_size] + fc_dynamics_layers + [encoding_size]
@@ -281,7 +288,11 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         return {"value_params": value_params, "state_params": state_params, "reward_params": reward_params}
 
     def initial_inference(self, observation, noise_z):
-        encoded_state = self.representation(observation)
+        if not self.config.use_representation and self.config.stacked_observations == 0:
+            encoded_state = observation.reshape(-1, self.config.observation_shape[-1])
+        else:
+            encoded_state = self.representation(observation)
+            
         policy_logits, value, value_params = self.prediction(encoded_state, noise_z)
         # reward equal to 0 for consistency
         reward = torch.log(
