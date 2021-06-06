@@ -11,7 +11,19 @@ from .abstract_game import AbstractGame
 class MuZeroConfig:
     def __init__(self):
         # More information is available here: https://github.com/werner-duvaud/muzero-general/wiki/Hyperparameter-Optimization
+        # Important Config
+        # value reward state
+        self.hypermodel = [0, 0, 0] 
+        self.normalization = [0, 0, 0] 
+        self.regularization = False
+        self.hyper_inp_dim = 32
+        self.num_simulations = 50  
+        self.reanalyse_num_simulations = 10
+        self.target_update_freq = 100
+        self.num_unroll_steps = 10 
+        self.td_steps = 50  
 
+        # Based Config
         self.seed = 0  # Seed for numpy, torch and the game
         self.max_num_gpus = None  # Fix the maximum number of GPUs to use. It's usually faster to use a single GPU (set it to 1) if it has enough memory. None will use every GPUs available
         self.episode = 200
@@ -30,7 +42,6 @@ class MuZeroConfig:
         self.num_workers = 1  # Number of simultaneous threads/workers self-playing to feed the replay buffer
         self.selfplay_on_gpu = False
         self.max_moves = 500  # Maximum number of moves if game is not finished before
-        self.num_simulations = 50  # Number of future moves self-simulated
         self.discount = 0.997  # Chronological discount of the reward
         self.temperature_threshold = None  # Number of moves before dropping the temperature given by visit_softmax_temperature_fn to 0 (ie selecting the best action). If None, visit_softmax_temperature_fn is used every time
 
@@ -45,11 +56,7 @@ class MuZeroConfig:
         ### Network
         self.network = "fullyconnected"  # "resnet" / "fullyconnected"
         self.support_size = 10  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size. Choose it so that support_size <= sqrt(max(abs(discounted reward)))
-        self.hypermodel = [0, 0, 0] # value_hyper; reward_hyper; state_hyper;
-        self.normalization = [0, 0, 0] # value_normalization; reward_normalization; state_normalization;
-        self.regularization = True
-        self.hyper_inp_dim = 32
-
+        
         # Residual Network
         self.downsample = False  # Downsample observations before representation network, False / "CNN" (lighter) / "resnet" (See paper appendix Network Architecture)
         self.blocks = 1  # Number of blocks in the ResNet
@@ -77,7 +84,6 @@ class MuZeroConfig:
         self.checkpoint_interval = 10  # Number of training steps before using the model for self-playing
         self.value_loss_weight = 1  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
         self.train_on_gpu = torch.cuda.is_available()  # Train on GPU if available
-
         self.optimizer = "Adam"  # "Adam" or "SGD". Paper uses SGD
         self.weight_decay = 1e-4  # L2 weights regularization
         self.momentum = 0.9  # Used only if optimizer is SGD
@@ -89,8 +95,6 @@ class MuZeroConfig:
 
         ### Replay Buffer
         self.replay_buffer_size = 500  # Number of self-play games to keep in the replay buffer
-        self.num_unroll_steps = 10  # Number of game moves to keep for every batch element
-        self.td_steps = 50  # Number of steps in the future to take into account for calculating the target value
         self.PER = True  # Prioritized Replay (See paper appendix Training), select in priority the elements in the replay buffer which are unexpected for the network
         self.PER_alpha = 0.5  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
 
@@ -98,8 +102,6 @@ class MuZeroConfig:
         self.use_reanalyse = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
         self.all_reanalyse = False
         self.reanalyse_on_gpu = False
-        self.reanalyse_num_simulations = 10
-        self.target_update_freq = 100
         self.num_process = 32
         self.use_multiprocess = True
 
