@@ -23,6 +23,15 @@ class MuZeroConfig:
         self.num_unroll_steps = 10 
         self.td_steps = 50  
 
+        # Fully Connected Network
+        self.stacked_observations = 0 
+        self.encoding_size = 8
+        self.fc_representation_layers = []  # Define the hidden layers in the representation network
+        self.fc_dynamics_layers = [16]  # Define the hidden layers in the dynamics network
+        self.fc_reward_layers = [16]  # Define the hidden layers in the reward network
+        self.fc_value_layers = [16]  # Define the hidden layers in the value network
+        self.fc_policy_layers = [16]  # Define the hidden layers in the policy network
+
         # Based Config
         self.seed = 0  # Seed for numpy, torch and the game
         self.max_num_gpus = None  # Fix the maximum number of GPUs to use. It's usually faster to use a single GPU (set it to 1) if it has enough memory. None will use every GPUs available
@@ -32,7 +41,6 @@ class MuZeroConfig:
         self.observation_shape = (1, 1, 4)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
         self.action_space = list(range(2))  # Fixed list of all possible actions. You should only edit the length
         self.players = list(range(1))  # List of players. You should only edit the length
-        self.stacked_observations = 0  # Number of previous observations and previous actions to add to the current observation
 
         # Evaluate
         self.muzero_player = 0  # Turn Muzero begins to play (0: MuZero plays first, 1: MuZero plays second)
@@ -67,14 +75,6 @@ class MuZeroConfig:
         self.resnet_fc_reward_layers = []  # Define the hidden layers in the reward head of the dynamic network
         self.resnet_fc_value_layers = []  # Define the hidden layers in the value head of the prediction network
         self.resnet_fc_policy_layers = []  # Define the hidden layers in the policy head of the prediction network
-
-        # Fully Connected Network
-        self.encoding_size = 8
-        self.fc_representation_layers = []  # Define the hidden layers in the representation network
-        self.fc_dynamics_layers = [16]  # Define the hidden layers in the dynamics network
-        self.fc_reward_layers = [16]  # Define the hidden layers in the reward network
-        self.fc_value_layers = [16]  # Define the hidden layers in the value network
-        self.fc_policy_layers = [16]  # Define the hidden layers in the policy network
 
         ### Training
         self.results_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../results", os.path.basename(__file__)[:-3] + "_" + datetime.datetime.now().strftime("%Y%m%d%H%M%S"))  # Path to store the model weights and TensorBoard logs
