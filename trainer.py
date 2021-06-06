@@ -21,6 +21,8 @@ class Trainer:
         self.writer = writer
         self.training_step = initial_checkpoint["training_step"]
 
+        self.debug_noise = torch.normal(0, 1, [1, int(self.config.hyper_inp_dim)])
+
         if "cuda" not in str(next(self.model.parameters()).device):
             print("You are not training on GPU.\n")
 
@@ -50,8 +52,22 @@ class Trainer:
             )
 
     def continuous_update_weights(self, replay_buffer, shared_storage):
-
         self.model.train()
+        if self.training_step % self.config.checkpoint_interval == 0:
+            for i, (name, param) in enumerate(self.model.named_parameters()):
+                if "bias" not in name and "param" in name:
+                    self.writer.add_histogram(f"1.Model/{name}", param)
+                    self.writer.add_scalar(
+                        f"4.Variance/{name}", torch.std(param), self.training_step,
+                    )
+            with torch.no_grad():
+                params = self.model.debug(self.debug_noise)
+            for name, param in params.items():
+                self.writer.add_histogram(f"3.Debug/{name}", param)
+                self.writer.add_scalar(
+                    f"5.Debug/{name}", torch.std(param), self.training_step
+                )
+
         index_batch, batch = replay_buffer.get_batch()
         self.update_lr()
         (
@@ -61,15 +77,6 @@ class Trainer:
             reward_loss,
             policy_loss,
         ) = self.update_weights(batch)
-
-        if self.training_step % 50 == 0:
-            for i, (name, param) in enumerate(self.model.named_parameters()):
-                if "bias" in name:
-                    continue
-                self.writer.add_histogram(f"1.Model/{name}", param, 0)
-                self.writer.add_scalar(
-                    f"4.Variance/{name}", torch.std(param), self.training_step,
-                )
 
         if self.config.PER:
             # Save new priorities in the replay buffer (See https://arxiv.org/abs/1803.00933)
@@ -150,8 +157,8 @@ class Trainer:
         )
         value_scalar.append(models.support_to_scalar(value, self.config.support_size))
         reward_scalar.append(models.support_to_scalar(reward, self.config.support_size))
-        if value_params is not None and self.training_step % 50 == 0:
-            self.writer.add_histogram(f"2.Hypermodel/value_params", value_params, 0)
+        if value_params is not None and self.training_step % self.config.checkpoint_interval == 0:
+            self.writer.add_histogram(f"2.Hypermodel/value_params", value_params)
             self.writer.add_scalar(
                 f"4.Variance/value_params", torch.std(value_params), self.training_step,
             )
@@ -166,19 +173,19 @@ class Trainer:
             hidden_state.register_hook(lambda grad: grad * 0.5)
             predictions.append((value, reward, policy_logits))
         # predictions: num_unroll_steps+1, 3, batch, 2*support_size+1 | 2*support_size+1 | 9 (according to the 2nd dim)
-        if state_params is not None and self.training_step % 50 == 0:
-            self.writer.add_histogram(f"2.Hypermodel/state_params", state_params, 0)
+        if state_params is not None and self.training_step % self.config.checkpoint_interval == 0:
+            self.writer.add_histogram(f"2.Hypermodel/state_params", state_params)
             self.writer.add_scalar(
                 f"4.Variance/state_params", torch.std(state_params), self.training_step,
             )
-        if reward_params is not None and self.training_step % 50 == 0:
-            self.writer.add_histogram(f"2.Hypermodel/reward_params", reward_params, 0)
+        if reward_params is not None and self.training_step % self.config.checkpoint_interval == 0:
+            self.writer.add_histogram(f"2.Hypermodel/reward_params", reward_params)
             self.writer.add_scalar(
                 f"4.Variance/reward_params", torch.std(reward_params), self.training_step,
             )
         value_scalar = torch.cat(value_scalar, dim=1)
         reward_scalar = torch.cat(reward_scalar, dim=1)
-        if self.training_step % 50 == 0:
+        if self.training_step % self.config.checkpoint_interval == 0:
             self.writer.add_scalar(
                     f"4.Variance/value", torch.std(value_scalar), self.training_step,
                 )

@@ -273,6 +273,13 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
 
         return next_encoded_state_normalized, reward, state_params, reward_params
 
+    def debug(self, noise_z):
+        value_params = self.value_params(noise_z) if self.value_hyper else None
+        state_params = self.state_params(noise_z) if self.state_hyper else None
+        reward_params = self.reward_params(noise_z) if self.reward_hyper else None
+
+        return {"value_params": value_params, "state_params": state_params, "reward_params": reward_params}
+
     def initial_inference(self, observation, noise_z):
         encoded_state = self.representation(observation)
         policy_logits, value, value_params = self.prediction(encoded_state, noise_z)
