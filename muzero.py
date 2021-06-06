@@ -21,7 +21,8 @@ import replay_buffer
 import self_play
 import shared_storage
 import trainer
-
+import warnings
+warnings.filterwarnings('ignore')
 
 class MuZero:
     """
