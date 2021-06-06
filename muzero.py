@@ -186,8 +186,8 @@ class MuZero:
             num_played_games = self.shared_storage_worker.get_info('num_played_games')
             if num_played_games % 2 == 0:
                 train_times = self.config.train_times(num_played_games)
-                for _ in tqdm(range(train_times)):
-                # for _ in range(train_times):
+                # for _ in tqdm(range(train_times)):
+                for _ in range(train_times):
                     training_step = self.shared_storage_worker.get_info("training_step")
                     if training_step % self.config.target_update_freq == 0:
                         # print(f"update target model")

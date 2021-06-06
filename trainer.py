@@ -63,10 +63,11 @@ class Trainer:
             with torch.no_grad():
                 params = self.model.debug(self.debug_noise)
             for name, param in params.items():
-                self.writer.add_histogram(f"3.Debug/{name}", param)
-                self.writer.add_scalar(
-                    f"5.Debug/{name}", torch.std(param), self.training_step
-                )
+                if param is not None:
+                    self.writer.add_histogram(f"3.Debug/{name}", param)
+                    self.writer.add_scalar(
+                        f"5.Debug/{name}", torch.std(param), self.training_step
+                    )
 
         index_batch, batch = replay_buffer.get_batch()
         self.update_lr()
