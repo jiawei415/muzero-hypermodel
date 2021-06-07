@@ -10,15 +10,17 @@ class SelfPlay:
     Class which run in a dedicated thread to play games and save them to the replay-buffer.
     """
 
-    def __init__(self, model, initial_checkpoint, Game, config, seed):
+    def __init__(self, model, initial_checkpoint, Game, config, writer):
         self.config = config
-        self.game = Game(seed)
+        self.game = Game(self.config.seed)
 
         # Fix random generator seed
-        numpy.random.seed(seed)
-        torch.manual_seed(seed)
+        numpy.random.seed(self.config.seed)
+        torch.manual_seed(self.config.seed)
         self.model = model
         self.noise_dim = int(self.config.hyper_inp_dim)
+        self.writer = writer
+        self.counter = 0
         
     def continuous_self_play(self, shared_storage, replay_buffer, test_mode=False):
         # self.model.set_weights(shared_storage.get_info("weights"))
@@ -146,7 +148,27 @@ class SelfPlay:
                     action, root = self.select_opponent_action(
                         opponent, stacked_observations
                     )
-
+                # Debug for action pi of initial state
+                if len(game_history.observation_history) == 1:
+                    debug_obs = (
+                        torch.tensor(stacked_observations)
+                        .float()
+                        .unsqueeze(0)
+                        .to(next(self.model.parameters()).device)
+                    )
+                    _, _, debug_logits, _, _ = self.model.initial_inference(
+                            debug_obs, torch.tensor(noise_z, dtype=torch.float)
+                        )
+                    debug_policy = torch.softmax(debug_logits, dim=1).squeeze()
+                    for i, a in enumerate(self.config.action_space):
+                        self.writer.add_scalar(
+                            f"5.Debug/mcts_action{i}", root.children[i].prior, self.counter
+                        )
+                        self.writer.add_scalar(
+                            f"5.Debug/model_action{i}", debug_policy[i], self.counter
+                        )
+                        self.counter += 1
+                          
                 observation, reward, done = self.game.step(action)
 
                 if render:
