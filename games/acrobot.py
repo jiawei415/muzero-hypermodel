@@ -39,6 +39,7 @@ class MuZeroConfig:
         self.episode = 200
 
         ### Game
+        self.use_reward_wrapper = False
         self.observation_shape = (1, 1, 6)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
         self.action_space = list(range(3))  # Fixed list of all possible actions. You should only edit the length
         self.players = list(range(1))  # List of players. You should only edit the length
@@ -162,7 +163,12 @@ class Game(AbstractGame):
         """
 
         observation, reward, done, _ = self.env.step(action)
+        if MuZeroConfig().use_reward_wrapper:
+            reward = self._reward_wrapper(reward)
         return numpy.array([[observation]]), reward, done
+
+    def _reward_wrapper(self, reward):
+        return 0 if reward == -1 else 1
 
     def legal_actions(self):
         """
