@@ -146,7 +146,7 @@ class Game(AbstractGame):
     """
 
     def __init__(self, seed=None):
-        self.env = gym.make("MountainCar-v0")
+        self.env = gym.make("MountainCar-v0").unwrapped
         if seed is not None:
             self.env.seed(seed)
 
