@@ -27,6 +27,7 @@ class ReplayBuffer:
                 f"Replay buffer initialized with {self.total_samples} samples ({self.num_played_games} games).\n"
             )
         self.reanalyse_worker = reanalyse_worker
+        self.use_value_noise, self.use_reward_noise = config.use_loss_noise
         # Fix random generator seed
         numpy.random.seed(self.config.seed)
         self.counter = self.config.seed + 1
@@ -291,15 +292,21 @@ class ReplayBuffer:
             state_index, state_index + self.config.num_unroll_steps + 1
         ):
             value = self.compute_target_value(game_history, current_index)
+            reward = game_history.reward_history[current_index]
 
+            target_noise = numpy.vdot(game_history.noise_history, game_history.unit_sphere_history[current_index])
+            if self.use_value_noise:
+                value += target_noise
+            if self.use_reward_noise:
+                reward += target_noise
             if current_index < len(game_history.root_values):
                 target_values.append(value)
-                target_rewards.append(game_history.reward_history[current_index])
+                target_rewards.append(reward)
                 target_policies.append(game_history.child_visits[current_index])
                 actions.append(game_history.action_history[current_index])
             elif current_index == len(game_history.root_values):
-                target_values.append(0)
-                target_rewards.append(game_history.reward_history[current_index])
+                target_values.append(0 if not self.use_value_noise else target_noise)
+                target_rewards.append(reward)
                 # Uniform policy
                 target_policies.append(
                     [
@@ -310,8 +317,8 @@ class ReplayBuffer:
                 actions.append(game_history.action_history[current_index])
             else:
                 # States past the end of games are treated as absorbing states
-                target_values.append(0)
-                target_rewards.append(0)
+                target_values.append(0 if not self.use_value_noise else target_noise)
+                target_rewards.append(0 if not self.use_reward_noise else target_noise)
                 # Uniform policy
                 target_policies.append(
                     [

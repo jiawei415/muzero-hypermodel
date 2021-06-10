@@ -98,8 +98,9 @@ class SelfPlay:
         game_history.action_history.append(0)
         game_history.observation_history.append(observation)
         game_history.reward_history.append(0)
+        game_history.unit_sphere_history.append(self.sample_unit_sphere())
         game_history.to_play_history.append(self.game.to_play())
-
+        
         done = False
 
         if render:
@@ -181,12 +182,23 @@ class SelfPlay:
                 game_history.action_history.append(action)
                 game_history.observation_history.append(observation)
                 game_history.reward_history.append(reward)
+                game_history.unit_sphere_history.append(self.sample_unit_sphere())
                 game_history.to_play_history.append(self.game.to_play())
         
         return game_history
 
     def close_game(self):
         self.game.close()
+
+    def sample_unit_sphere(self, size=600):
+        mean = numpy.zeros(self.noise_dim)
+        conv = numpy.identity(self.noise_dim)
+        normal_deviates = numpy.random.multivariate_normal(mean=mean, cov=conv, size=size).T
+        radius = numpy.sqrt((normal_deviates**2).sum(axis=0))
+        points = normal_deviates/radius
+        sample_points = numpy.random.choice(points.reshape(-1), [1, self.noise_dim], replace=False)
+        return sample_points
+
 
     def select_opponent_action(self, opponent, stacked_observations):
         """
@@ -496,6 +508,7 @@ class GameHistory:
         self.child_visits = []
         self.root_values = []
         self.noise_history = None
+        self.unit_sphere_history = []
         # For PER
         self.priorities = None
         self.game_priority = None

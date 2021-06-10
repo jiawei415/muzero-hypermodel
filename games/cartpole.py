@@ -13,6 +13,7 @@ class MuZeroConfig:
         # More information is available here: https://github.com/werner-duvaud/muzero-general/wiki/Hyperparameter-Optimization
         # Important Config
         # value reward state
+        self.use_loss_noise = [1, 1]
         self.hypermodel = [1, 1, 0] 
         self.normalization = [0, 0, 0] 
         self.regularization = False
