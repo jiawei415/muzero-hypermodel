@@ -283,29 +283,38 @@ class ReplayBuffer:
 
             return value
 
+    def compute_target_noise(self, game_history, index):
+        if index <= len(game_history.root_values):
+            target_noise = numpy.vdot(game_history.noise_history, 
+                game_history.unit_sphere_history[index])
+        else:
+            target_noise = 0
+        return target_noise
+
     def make_target(self, game_history, state_index):
         """
         Generate targets for every unroll steps.
         """
         target_values, target_rewards, target_policies, actions = [], [], [], []
+        game_history_len = len(game_history.root_values)
         for current_index in range(
             state_index, state_index + self.config.num_unroll_steps + 1
         ):
-            value = self.compute_target_value(game_history, current_index)
-            reward = game_history.reward_history[current_index]
-
-            target_noise = numpy.vdot(game_history.noise_history, game_history.unit_sphere_history[current_index])
+            value = self.compute_target_value(game_history, current_index) if current_index < game_history_len else 0
+            reward = 0 if current_index > game_history_len else game_history.reward_history[current_index] 
+            target_noise = self.compute_target_noise(game_history, current_index)
             if self.use_value_noise:
                 value += target_noise
             if self.use_reward_noise:
                 reward += target_noise
-            if current_index < len(game_history.root_values):
+            
+            if current_index < game_history_len:
                 target_values.append(value)
                 target_rewards.append(reward)
                 target_policies.append(game_history.child_visits[current_index])
                 actions.append(game_history.action_history[current_index])
-            elif current_index == len(game_history.root_values):
-                target_values.append(0 if not self.use_value_noise else target_noise)
+            elif current_index == game_history_len:
+                target_values.append(value)
                 target_rewards.append(reward)
                 # Uniform policy
                 target_policies.append(
@@ -317,8 +326,8 @@ class ReplayBuffer:
                 actions.append(game_history.action_history[current_index])
             else:
                 # States past the end of games are treated as absorbing states
-                target_values.append(0 if not self.use_value_noise else target_noise)
-                target_rewards.append(0 if not self.use_reward_noise else target_noise)
+                target_values.append(value)
+                target_rewards.append(reward)
                 # Uniform policy
                 target_policies.append(
                     [
