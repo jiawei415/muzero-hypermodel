@@ -98,8 +98,9 @@ class SelfPlay:
         game_history.action_history.append(0)
         game_history.observation_history.append(observation)
         game_history.reward_history.append(0)
-        game_history.unit_sphere_history.append(self.sample_unit_sphere())
         game_history.to_play_history.append(self.game.to_play())
+        if any(self.config.use_loss_noise):
+            game_history.unit_sphere_history.append(self.sample_unit_sphere())
         
         done = False
 
@@ -177,13 +178,13 @@ class SelfPlay:
                     self.game.render()
 
                 game_history.store_search_statistics(root, self.config.action_space)
-
                 # Next batch
                 game_history.action_history.append(action)
                 game_history.observation_history.append(observation)
                 game_history.reward_history.append(reward)
-                game_history.unit_sphere_history.append(self.sample_unit_sphere())
                 game_history.to_play_history.append(self.game.to_play())
+                if any(self.config.use_loss_noise):
+                    game_history.unit_sphere_history.append(self.sample_unit_sphere())
         
         return game_history
 
@@ -198,7 +199,6 @@ class SelfPlay:
         points = normal_deviates/radius
         sample_points = numpy.random.choice(points.reshape(-1), [1, self.noise_dim], replace=False)
         return sample_points
-
 
     def select_opponent_action(self, opponent, stacked_observations):
         """
