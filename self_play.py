@@ -26,63 +26,27 @@ class SelfPlay:
         # self.model.set_weights(shared_storage.get_info("weights"))
         self.model.eval()
 
-        if not test_mode:
-            game_history = self.play_game(
-                self.config.visit_softmax_temperature_fn(
-                    trained_steps=shared_storage.get_info("training_step")
-                ),
-                self.config.temperature_threshold,
-                False,
-                "self",
-                0,
-            )
-            replay_buffer.save_game(game_history, shared_storage)
+        game_history = self.play_game(
+            self.config.visit_softmax_temperature_fn(
+                trained_steps=shared_storage.get_info("training_step")
+            ),
+            self.config.temperature_threshold,
+            False,
+            "self",
+            0,
+        )
+        replay_buffer.save_game(game_history, shared_storage)
 
-            shared_storage.set_info(
-                {
-                    "episode_length": len(game_history.action_history) - 1,
-                    "total_reward": sum(game_history.reward_history),
-                    "mean_value": numpy.mean(
-                        [value for value in game_history.root_values if value]
-                    ),
-                }
-            )
-        else:
-            # Take the best action (no exploration) in test mode
-            game_history = self.play_game(
-                0,
-                self.config.temperature_threshold,
-                False,
-                "self" if len(self.config.players) == 1 else self.config.opponent,
-                self.config.muzero_player,
-            )
-            # Save to the shared storage
-            shared_storage.set_info(
-                {
-                    "episode_length": len(game_history.action_history) - 1,
-                    "total_reward": sum(game_history.reward_history),
-                    "mean_value": numpy.mean(
-                        [value for value in game_history.root_values if value]
-                    ),
-                }
-            )
-            if 1 < len(self.config.players):
-                shared_storage.set_info(
-                    {
-                        "muzero_reward": sum(
-                            reward
-                            for i, reward in enumerate(game_history.reward_history)
-                            if game_history.to_play_history[i - 1]
-                            == self.config.muzero_player
-                        ),
-                        "opponent_reward": sum(
-                            reward
-                            for i, reward in enumerate(game_history.reward_history)
-                            if game_history.to_play_history[i - 1]
-                            != self.config.muzero_player
-                        ),
-                    }
-                )
+        shared_storage.set_info(
+            {
+                "episode_length": len(game_history.action_history) - 1,
+                "total_reward": sum(game_history.reward_history),
+                "mean_value": numpy.mean(
+                    [value for value in game_history.root_values if value]
+                ),
+            }
+        )
+
         self.close_game()    
 
     def play_game(
@@ -91,9 +55,14 @@ class SelfPlay:
         """
         Play one game with actions based on the Monte Carlo tree search at each moves.
         """
-        game_history = GameHistory()
+        done = False
         observation = self.game.reset()
         noise_z = numpy.random.normal(0, 1, [1, self.noise_dim])
+        
+        if render:
+            self.game.render()
+
+        game_history = GameHistory()
         game_history.noise_history = noise_z
         game_history.action_history.append(0)
         game_history.observation_history.append(observation)
@@ -102,11 +71,6 @@ class SelfPlay:
         if any(self.config.use_loss_noise):
             game_history.unit_sphere_history.append(self.sample_unit_sphere())
         
-        done = False
-
-        if render:
-            self.game.render()
-
         with torch.no_grad():
             while (
                 not done and len(game_history.action_history) <= self.config.max_moves
@@ -123,33 +87,31 @@ class SelfPlay:
                 )
 
                 # Choose the action
-                if opponent == "self" or muzero_player == self.game.to_play():
-                    root, mcts_info = MCTS(self.config).run(
-                        noise_z,
-                        self.config.num_simulations,
-                        self.model,
-                        stacked_observations,
-                        self.game.legal_actions(),
-                        self.game.to_play(),
-                        True,
-                    )
-                    action = self.select_action(
-                        root,
-                        temperature
-                        if not temperature_threshold
-                        or len(game_history.action_history) < temperature_threshold
-                        else 0,
-                    )
+                root, mcts_info = MCTS(self.config).run(
+                    noise_z,
+                    self.config.num_simulations,
+                    self.model,
+                    stacked_observations,
+                    self.game.legal_actions(),
+                    self.game.to_play(),
+                    True,
+                )
+                action = self.select_action(
+                    root,
+                    temperature
+                    if not temperature_threshold
+                    or len(game_history.action_history) < temperature_threshold
+                    else 0,
+                )
 
-                    if render:
-                        print(f'Tree depth: {mcts_info["max_tree_depth"]}')
-                        print(
-                            f"Root value for player {self.game.to_play()}: {root.value():.2f}"
-                        )
-                else:
-                    action, root = self.select_opponent_action(
-                        opponent, stacked_observations
+                if render:
+                    print(f'Tree depth: {mcts_info["max_tree_depth"]}')
+                    print(
+                        f"Root value for player {self.game.to_play()}: {root.value():.2f}"
                     )
+                    print(f"Played action: {self.game.action_to_string(action)}")
+                    self.game.render()
+          
                 # Debug for action pi of initial state
                 if len(game_history.observation_history) == 1:
                     debug_obs = (
@@ -173,10 +135,6 @@ class SelfPlay:
                           
                 observation, reward, done = self.game.step(action)
 
-                if render:
-                    print(f"Played action: {self.game.action_to_string(action)}")
-                    self.game.render()
-
                 game_history.store_search_statistics(root, self.config.action_space)
                 # Next batch
                 game_history.action_history.append(action)
@@ -195,40 +153,6 @@ class SelfPlay:
         noise = numpy.random.normal(0, 1, [1, self.noise_dim])
         noise /= numpy.sqrt((noise**2).sum())
         return noise
-
-    def select_opponent_action(self, opponent, stacked_observations):
-        """
-        Select opponent action for evaluating MuZero level.
-        """
-        if opponent == "human":
-            root, mcts_info = MCTS(self.config).run(
-                self.model,
-                stacked_observations,
-                self.game.legal_actions(),
-                self.game.to_play(),
-                True,
-            )
-            print(f'Tree depth: {mcts_info["max_tree_depth"]}')
-            print(f"Root value for player {self.game.to_play()}: {root.value():.2f}")
-            print(
-                f"Player {self.game.to_play()} turn. MuZero suggests {self.game.action_to_string(self.select_action(root, 0))}"
-            )
-            return self.game.human_to_action(), root
-        elif opponent == "expert":
-            return self.game.expert_agent(), None
-        elif opponent == "random":
-            assert (
-                self.game.legal_actions()
-            ), f"Legal actions should not be an empty array. Got {self.game.legal_actions()}."
-            assert set(self.game.legal_actions()).issubset(
-                set(self.config.action_space)
-            ), "Legal actions should be a subset of the action space."
-
-            return numpy.random.choice(self.game.legal_actions()), None
-        else:
-            raise NotImplementedError(
-                'Wrong argument: "opponent" argument should be "self", "human", "expert" or "random"'
-            )
 
     @staticmethod
     def select_action(node, temperature):
