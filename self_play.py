@@ -191,14 +191,10 @@ class SelfPlay:
     def close_game(self):
         self.game.close()
 
-    def sample_unit_sphere(self, size=600):
-        mean = numpy.zeros(self.noise_dim)
-        conv = numpy.identity(self.noise_dim)
-        normal_deviates = numpy.random.multivariate_normal(mean=mean, cov=conv, size=size).T
-        radius = numpy.sqrt((normal_deviates**2).sum(axis=0))
-        points = normal_deviates/radius
-        sample_points = numpy.random.choice(points.reshape(-1), [1, self.noise_dim], replace=False)
-        return sample_points
+    def sample_unit_sphere(self):
+        noise = numpy.random.normal(0, 1, [1, self.noise_dim])
+        noise /= numpy.sqrt((noise**2).sum())
+        return noise
 
     def select_opponent_action(self, opponent, stacked_observations):
         """
