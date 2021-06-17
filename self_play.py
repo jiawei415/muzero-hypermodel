@@ -150,8 +150,8 @@ class SelfPlay:
 
     def train_game(self):
         train_times = self.config.train_times(self.global_step)
-        for _ in tqdm(range(train_times)):
-        # for _ in range(train_times):
+        # for _ in tqdm(range(train_times)):
+        for _ in range(train_times):
             self.trainer.continuous_update_weights(self.replay_buffer, self.shared_storage)
 
     def close_game(self):
