@@ -23,7 +23,8 @@ class MuZeroConfig:
         self.target_update_freq = 100
         self.num_unroll_steps = 10 
         self.td_steps = 50  
-        self.train_frequency = 500
+        self.train_frequency = 100
+        self.train_proportion = 0.01
         self.start_train = 2
 
         # Fully Connected Network
@@ -141,6 +142,9 @@ class MuZeroConfig:
             return 400 # 800 if self.use_reanalyse else 400
         else:
             return 600 # 1000 if self.use_reanalyse else 600
+    
+    def train_per_paly(self, num_played_steps):
+        return int(num_played_steps * self.train_proportion)
 
 
 class Game(AbstractGame):

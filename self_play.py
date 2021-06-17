@@ -149,7 +149,8 @@ class SelfPlay:
         return game_history
 
     def train_game(self):
-        train_times = self.config.train_times(self.global_step)
+        train_times = self.config.train_per_paly(self.global_step)
+        # train_times = self.config.train_times(self.shared_storage.get_info("num_played_games"))
         # for _ in tqdm(range(train_times)):
         for _ in range(train_times):
             self.trainer.continuous_update_weights(self.replay_buffer, self.shared_storage)
