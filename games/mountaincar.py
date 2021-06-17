@@ -22,6 +22,8 @@ class MuZeroConfig:
         self.reanalyse_num_simulations = 10
         self.target_update_freq = 100
         self.num_unroll_steps = 10 
+        self.train_frequency = 500
+        self.start_train = 2
         self.td_steps = 50  
 
         # Fully Connected Network

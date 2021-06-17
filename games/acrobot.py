@@ -23,6 +23,8 @@ class MuZeroConfig:
         self.target_update_freq = 100
         self.num_unroll_steps = 10 
         self.td_steps = 50  
+        self.train_frequency = 500
+        self.start_train = 2
 
         # Fully Connected Network
         self.stacked_observations = 0

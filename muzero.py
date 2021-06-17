@@ -1,70 +1,30 @@
+import os
+import sys
 import copy
 import glog
-import importlib
-import math
-import os
-import pickle
-import sys
 import time
-from tqdm import tqdm
-
 import numpy
-# import ray
 import torch
-from torch.utils.tensorboard import SummaryWriter
-
-
-import models
-import replay_buffer
-import self_play
-import shared_storage
-import trainer
+import pickle
 import warnings
-warnings.filterwarnings('ignore')
+import importlib
+from tqdm import tqdm
+from torch.utils.tensorboard import SummaryWriter
+import models
+import trainer
+import self_play
+import replay_buffer
+import shared_storage
 
 class MuZero:
-    """
-    Main class to manage MuZero.
-
-    Args:
-        game_name (str): Name of the game module, it should match the name of a .py file
-        in the "./games" directory.
-
-        config (dict, MuZeroConfig, optional): Override the default config of the game.
-
-        split_resources_in (int, optional): Split the GPU usage when using concurent muzero instances.
-
-    Example:
-        >>> muzero = MuZero("cartpole")
-        >>> muzero.train()
-        >>> muzero.test(render=True)
-    """
-
     def __init__(self, game_name, config=None, split_resources_in=1):
         # Load the game and the config from the module with the game name
-        try:
-            game_module = importlib.import_module("games." + game_name)
-            self.Game = game_module.Game
-            self.config = game_module.MuZeroConfig()
-            self.config.game_filename = game_name
-        except ModuleNotFoundError as err:
-            print(
-                f'{game_name} is not a supported game name, try "cartpole" or refer to the documentation for adding a new game.'
-            )
-            raise err
-
-        # Overwrite the config
-        if config:
-            if type(config) is dict:
-                for param, value in config.items():
-                    setattr(self.config, param, value)
-            else:
-                self.config = config
-
+        game_module = importlib.import_module("games." + game_name)
+        self.config = game_module.MuZeroConfig()
+        self.config.game_filename = game_name
         # Fix random generator seed
         numpy.random.seed(self.config.seed)
         torch.manual_seed(self.config.seed)
-
         # Checkpoint and replay buffer used to initialize workers
         self.checkpoint = {
             "weights": None,
@@ -86,7 +46,6 @@ class MuZero:
             "terminate": False,
         }
         self.replay_buffer = {}
-
         cpu_actor = CPUActor()
         weights, summary, self.model, self.target_model = cpu_actor.get_initial_weights(self.config)
         self.checkpoint["weights"] = copy.deepcopy(weights)
@@ -100,12 +59,6 @@ class MuZero:
         self.shared_storage_worker = None
 
     def init_workers(self, log_in_tensorboard=True):
-        """
-        Spawn ray workers and launch the training.
-
-        Args:
-            log_in_tensorboard (bool): Start a testing worker and log its performance in TensorBoard.
-        """
         if log_in_tensorboard or self.config.save_model:
             os.makedirs(self.config.results_path, exist_ok=True)
             # self.test_worker = self_play.SelfPlay(self.checkpoint, self.Game, self.config, self.config.seed)
@@ -134,31 +87,17 @@ class MuZero:
         # Initialize workers
         self.shared_storage_worker = shared_storage.SharedStorage(self.checkpoint, self.config)
         self.shared_storage_worker.set_info("terminate", False)
-
-        self.training_worker = trainer.Trainer(self.model, self.checkpoint, self.config, self.writer)
-        self.self_play_worker = self_play.SelfPlay(self.model, self.checkpoint, self.Game, self.config, self.writer)
+        
         self.reanalyse_worker = replay_buffer.Reanalyse(self.target_model, self.checkpoint, self.shared_storage_worker, self.config)
         self.replay_buffer_worker = replay_buffer.ReplayBuffer(self.checkpoint, self.replay_buffer, self.reanalyse_worker, self.config)
+        self.training_worker = trainer.Trainer(self.model, self.target_model, self.checkpoint, self.config, self.writer)
+        self.self_play_worker = self_play.SelfPlay(self.model, self.training_worker, self.shared_storage_worker, self.replay_buffer_worker, self.config, self.writer)
 
     def train(self, log_in_tensorboard=True):
         self.init_workers(log_in_tensorboard=log_in_tensorboard)
         for counter in range(self.config.episode):
-            self.self_play_worker.continuous_self_play(self.shared_storage_worker, self.replay_buffer_worker)
-            num_played_games = self.shared_storage_worker.get_info('num_played_games')
-            if num_played_games % 2 == 0:
-                train_times = self.config.train_times(num_played_games)
-                # for _ in tqdm(range(train_times)):
-                for _ in range(train_times):
-                    training_step = self.shared_storage_worker.get_info("training_step")
-                    if training_step % self.config.target_update_freq == 0:
-                        # print(f"update target model")
-                        self.target_model.load_state_dict(self.model.state_dict())
-                    self.training_worker.continuous_update_weights(self.replay_buffer_worker, self.shared_storage_worker)
-
-            if log_in_tensorboard:
-                # self.test_worker.continuous_self_play(self.shared_storage_worker, None, True)
-                self.logging_loop(counter)
-
+            self.self_play_worker.continuous_self_play()
+            if log_in_tensorboard: self.logging_loop(counter)
 
         if self.config.save_model:
             # Persist replay buffer to disk
@@ -282,7 +221,8 @@ class CPUActor:
         return weigths, summary, model, target_model
 
 
-if __name__ == "__main__":
+if __name__ == "__main__": 
+    warnings.filterwarnings('ignore')
     try:
         game = sys.argv[1]
     except:

@@ -3,41 +3,44 @@ import time
 import numpy
 import torch
 import models
+import importlib
 from tqdm import tqdm
 
 class SelfPlay:
     """
     Class which run in a dedicated thread to play games and save them to the replay-buffer.
     """
-
-    def __init__(self, model, initial_checkpoint, Game, config, writer):
+    def __init__(self, model, trainer, shared_storage, replay_buffer, config, writer):
         self.config = config
+        game_module = importlib.import_module("games." + self.config.game_filename)
+        Game = game_module.Game
         self.game = Game(self.config.seed)
 
         # Fix random generator seed
         numpy.random.seed(self.config.seed)
         torch.manual_seed(self.config.seed)
         self.model = model
+        self.trainer = trainer
+        self.shared_storage = shared_storage
+        self.replay_buffer = replay_buffer
         self.noise_dim = int(self.config.hyper_inp_dim)
         self.writer = writer
         self.counter = 0
+        self.global_step = 0
         
-    def continuous_self_play(self, shared_storage, replay_buffer, test_mode=False):
-        # self.model.set_weights(shared_storage.get_info("weights"))
+    def continuous_self_play(self):
         self.model.eval()
-
         game_history = self.play_game(
             self.config.visit_softmax_temperature_fn(
-                trained_steps=shared_storage.get_info("training_step")
+                trained_steps=self.shared_storage.get_info("training_step")
             ),
             self.config.temperature_threshold,
             False,
             "self",
             0,
         )
-        replay_buffer.save_game(game_history, shared_storage)
-
-        shared_storage.set_info(
+        self.replay_buffer.save_game(game_history, self.shared_storage)
+        self.shared_storage.set_info(
             {
                 "episode_length": len(game_history.action_history) - 1,
                 "total_reward": sum(game_history.reward_history),
@@ -71,21 +74,19 @@ class SelfPlay:
         if any(self.config.use_loss_noise):
             game_history.unit_sphere_history.append(self.sample_unit_sphere())
         
-        with torch.no_grad():
-            while (
-                not done and len(game_history.action_history) <= self.config.max_moves
-            ):
-                assert (
-                    len(numpy.array(observation).shape) == 3
-                ), f"Observation should be 3 dimensionnal instead of {len(numpy.array(observation).shape)} dimensionnal. Got observation of shape: {numpy.array(observation).shape}"
-                assert (
-                    numpy.array(observation).shape == self.config.observation_shape
-                ), f"Observation should match the observation_shape defined in MuZeroConfig. Expected {self.config.observation_shape} but got {numpy.array(observation).shape}."
+        while not done and len(game_history.action_history) <= self.config.max_moves:
+            assert (
+                len(numpy.array(observation).shape) == 3
+            ), f"Observation should be 3 dimensionnal instead of {len(numpy.array(observation).shape)} dimensionnal. Got observation of shape: {numpy.array(observation).shape}"
+            assert (
+                numpy.array(observation).shape == self.config.observation_shape
+            ), f"Observation should match the observation_shape defined in MuZeroConfig. Expected {self.config.observation_shape} but got {numpy.array(observation).shape}."
+            
+            with torch.no_grad():
                 stacked_observations = game_history.get_stacked_observations(
                     -1,
                     self.config.stacked_observations,
                 )
-
                 # Choose the action
                 root, mcts_info = MCTS(self.config).run(
                     noise_z,
@@ -106,9 +107,7 @@ class SelfPlay:
 
                 if render:
                     print(f'Tree depth: {mcts_info["max_tree_depth"]}')
-                    print(
-                        f"Root value for player {self.game.to_play()}: {root.value():.2f}"
-                    )
+                    print(f"Root value for player {self.game.to_play()}: {root.value():.2f}")
                     print(f"Played action: {self.game.action_to_string(action)}")
                     self.game.render()
           
@@ -134,8 +133,8 @@ class SelfPlay:
                         self.counter += 1
                           
                 observation, reward, done = self.game.step(action)
-
                 game_history.store_search_statistics(root, self.config.action_space)
+                self.global_step += 1
                 # Next batch
                 game_history.action_history.append(action)
                 game_history.observation_history.append(observation)
@@ -143,8 +142,17 @@ class SelfPlay:
                 game_history.to_play_history.append(self.game.to_play())
                 if any(self.config.use_loss_noise):
                     game_history.unit_sphere_history.append(self.sample_unit_sphere())
-        
+
+            if self.shared_storage.get_info("num_played_games") >= self.config.start_train and self.global_step % self.config.train_frequency == 0:
+                self.train_game()
+
         return game_history
+
+    def train_game(self):
+        train_times = self.config.train_times(self.global_step)
+        for _ in tqdm(range(train_times)):
+        # for _ in range(train_times):
+            self.trainer.continuous_update_weights(self.replay_buffer, self.shared_storage)
 
     def close_game(self):
         self.game.close()

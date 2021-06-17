@@ -1,9 +1,7 @@
 import copy
-import time
 import numpy
 import torch
 import models
-
 
 class Trainer:
     """
@@ -11,16 +9,16 @@ class Trainer:
     in the shared storage.
     """
 
-    def __init__(self, model, initial_checkpoint, config, writer):
+    def __init__(self, model, target_model, initial_checkpoint, config, writer):
         self.config = config
 
         # Fix random generator seed
         numpy.random.seed(self.config.seed)
         torch.manual_seed(self.config.seed)
         self.model = model
+        self.target_model = target_model
         self.writer = writer
         self.training_step = initial_checkpoint["training_step"]
-
         self.debug_noise = torch.normal(0, 1, [1, int(self.config.hyper_inp_dim)])
 
         if "cuda" not in str(next(self.model.parameters()).device):
@@ -52,6 +50,9 @@ class Trainer:
             )
 
     def continuous_update_weights(self, replay_buffer, shared_storage):
+        if self.training_step % self.config.target_update_freq == 0:
+            print(f"update target model")
+            self.target_model.load_state_dict(self.model.state_dict())
         self.model.train()
         if self.training_step % self.config.checkpoint_interval == 0:
             for i, (name, param) in enumerate(self.model.named_parameters()):

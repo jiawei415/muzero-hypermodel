@@ -15,7 +15,7 @@ class MuZeroConfig:
         # value reward state
         self.use_loss_noise = [1, 0]
         self.hypermodel = [1, 1, 0] 
-        self.normalization = [0, 0, 0] 
+        self.normalization = [1, 1, 0] 
         self.regularization = False
         self.hyper_inp_dim = 32
         self.num_simulations = 50  
@@ -23,6 +23,8 @@ class MuZeroConfig:
         self.target_update_freq = 100
         self.num_unroll_steps = 10 
         self.td_steps = 50  
+        self.train_frequency = 500
+        self.start_train = 2
 
         # Fully Connected Network
         self.stacked_observations = 0
