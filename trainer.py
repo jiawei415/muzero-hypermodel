@@ -9,51 +9,27 @@ class Trainer:
     in the shared storage.
     """
 
-    def __init__(self, model, target_model, initial_checkpoint, config, writer):
+    def __init__(self, model, target_model, optimizer, config, writer):
         self.config = config
-
         # Fix random generator seed
         numpy.random.seed(self.config.seed)
         torch.manual_seed(self.config.seed)
         self.model = model
         self.target_model = target_model
+        self.optimizer = optimizer
         self.writer = writer
-        self.training_step = initial_checkpoint["training_step"]
+        self.training_step = 0 
         self.debug_noise = torch.normal(0, 1, [1, int(self.config.hyper_inp_dim)])
 
-        if "cuda" not in str(next(self.model.parameters()).device):
-            print("You are not training on GPU.\n")
-
-        # Initialize the optimizer
-        if self.config.optimizer == "SGD":
-            self.optimizer = torch.optim.SGD(
-                self.model.parameters(),
-                lr=self.config.lr_init,
-                momentum=self.config.momentum,
-                weight_decay=self.config.weight_decay,
-            )
-        elif self.config.optimizer == "Adam":
-            self.optimizer = torch.optim.Adam(
-                self.model.parameters(),
-                lr=self.config.lr_init,
-                weight_decay=self.config.weight_decay,
-            )
-        else:
-            raise NotImplementedError(
-                f"{self.config.optimizer} is not implemented. You can change the optimizer manually in trainer.py."
-            )
-
-        if initial_checkpoint["optimizer_state"] is not None:
-            print("Loading optimizer...\n")
-            self.optimizer.load_state_dict(
-                copy.deepcopy(initial_checkpoint["optimizer_state"])
-            )
-
-    def continuous_update_weights(self, replay_buffer, shared_storage):
+    def train_game(self, batch):
         if self.training_step % self.config.target_update_freq == 0:
-            print(f"update target model")
+            # print(f"update target model")
             self.target_model.load_state_dict(self.model.state_dict())
         self.model.train()
+        self.update_lr()
+        priorities, losses = self.update_weights(batch)
+        infos = {"training_step": self.training_step, "rl": self.optimizer.param_groups[0]["lr"]}
+        
         if self.training_step % self.config.checkpoint_interval == 0:
             for i, (name, param) in enumerate(self.model.named_parameters()):
                 if "bias" not in name and "param" in name:
@@ -69,49 +45,13 @@ class Trainer:
                     self.writer.add_scalar(
                         f"5.Debug/{name}", torch.std(param), self.training_step
                     )
-
-        index_batch, batch = replay_buffer.get_batch()
-        self.update_lr()
-        (
-            priorities,
-            total_loss,
-            value_loss,
-            reward_loss,
-            policy_loss,
-        ) = self.update_weights(batch)
-
-        if self.config.PER:
-            # Save new priorities in the replay buffer (See https://arxiv.org/abs/1803.00933)
-            replay_buffer.update_priorities(priorities, index_batch)
-
-        # Save to the shared storage
-        if self.training_step % self.config.checkpoint_interval == 0:
-            shared_storage.set_info(
-                {
-                    "weights": copy.deepcopy(self.model.get_weights()),
-                    "optimizer_state": copy.deepcopy(
-                        models.dict_to_cpu(self.optimizer.state_dict())
-                    ),
-                }
-            )
-            if self.config.save_model:
-                shared_storage.save_checkpoint()
-        shared_storage.set_info(
-            {
-                "training_step": self.training_step,
-                "lr": self.optimizer.param_groups[0]["lr"],
-                "total_loss": total_loss,
-                "value_loss": value_loss,
-                "reward_loss": reward_loss,
-                "policy_loss": policy_loss,
-            }
-        )
+        return priorities, losses, infos
 
     def update_weights(self, batch):
         """
         Perform one training step.
         """
-
+        losses = {}
         (
             observation_batch,
             noise_batch,
@@ -189,11 +129,11 @@ class Trainer:
         reward_scalar = torch.cat(reward_scalar, dim=1)
         if self.training_step % self.config.checkpoint_interval == 0:
             self.writer.add_scalar(
-                    f"4.Variance/value", torch.std(value_scalar), self.training_step,
-                )
+                f"4.Variance/value", torch.std(value_scalar), self.training_step,
+            )
             self.writer.add_scalar(
-                    f"4.Variance/reward", torch.std(reward_scalar), self.training_step,
-                )
+                f"4.Variance/reward", torch.std(reward_scalar), self.training_step,
+            )
 
         ## Compute losses
         value_loss, reward_loss, policy_loss = (0, 0, 0)
@@ -282,14 +222,11 @@ class Trainer:
         self.optimizer.step()
         self.training_step += 1
 
-        return (
-            priorities,
-            # For log purpose
-            loss.item(),
-            value_loss.mean().item(),
-            reward_loss.mean().item(),
-            policy_loss.mean().item(),
-        )
+        losses = {"total_loss": loss.item(), 
+                  "value_loss": value_loss.mean().item(),
+                  "reward_loss": reward_loss.mean().item(),
+                  "policy_loss": policy_loss.mean().item(),}
+        return priorities, losses
 
     def update_lr(self):
         """

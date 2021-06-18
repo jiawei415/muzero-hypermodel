@@ -15,6 +15,7 @@ import trainer
 import self_play
 import replay_buffer
 import shared_storage
+from self_play import GameHistory
 
 class MuZero:
     def __init__(self, game_name, config=None, split_resources_in=1):
@@ -45,14 +46,13 @@ class MuZero:
             "num_reanalysed_games": 0,
             "terminate": False,
         }
-        self.replay_buffer = {}
-        cpu_actor = CPUActor()
-        weights, summary, self.model, self.target_model = cpu_actor.get_initial_weights(self.config)
+        # self.replay_buffer = {}
+        cpu_actor = CPUActor(self.config)
+        weights, summary, self.model, self.target_model, self.optimizer = cpu_actor.initial_model_and_optimizer()
         self.checkpoint["weights"] = copy.deepcopy(weights)
         self.summary = copy.deepcopy(summary)
         # Workers
         self.self_play_workers = None
-        self.test_worker = None
         self.training_worker = None
         self.reanalyse_worker = None
         self.replay_buffer_worker = None
@@ -88,17 +88,75 @@ class MuZero:
         self.shared_storage_worker = shared_storage.SharedStorage(self.checkpoint, self.config)
         self.shared_storage_worker.set_info("terminate", False)
         
-        self.reanalyse_worker = replay_buffer.Reanalyse(self.target_model, self.checkpoint, self.shared_storage_worker, self.config)
-        self.replay_buffer_worker = replay_buffer.ReplayBuffer(self.checkpoint, self.replay_buffer, self.reanalyse_worker, self.config)
-        self.training_worker = trainer.Trainer(self.model, self.target_model, self.checkpoint, self.config, self.writer)
-        self.self_play_worker = self_play.SelfPlay(self.model, self.training_worker, self.shared_storage_worker, self.replay_buffer_worker, self.config, self.writer)
+        self.reanalyse_worker = replay_buffer.Reanalyse(self.target_model, self.config)
+        self.replay_buffer_worker = replay_buffer.ReplayBuffer(self.reanalyse_worker, self.config)
+        self.training_worker = trainer.Trainer(self.model, self.target_model, self.optimizer, self.config, self.writer)
+        self.self_play_worker = self_play.SelfPlay(self.model, self.config, self.writer)
 
     def train(self, log_in_tensorboard=True):
         self.init_workers(log_in_tensorboard=log_in_tensorboard)
+        num_played_games = 0
+        num_played_steps = 0
         for counter in range(self.config.episode):
-            self.self_play_worker.continuous_self_play()
-            if log_in_tensorboard: self.logging_loop(counter)
+            done = False
+            game_history = self.self_play_worker.start_game()
+            while not done and len(game_history.action_history) <= self.config.max_moves:
+                done = self.self_play_worker.play_game(
+                    game_history,
+                    self.config.visit_softmax_temperature_fn(
+                        trained_steps=self.shared_storage_worker.get_info("training_step")
+                    ),
+                    self.config.temperature_threshold,
+                )
+                num_played_steps += 1
+            num_played_games += 1           
+            self.self_play_worker.close_game()
+            self.replay_buffer_worker.save_game(game_history)
+            
+            if num_played_games >= self.config.start_train and num_played_steps % self.config.train_frequency == 0:
+                train_times = self.config.train_per_paly(num_played_steps)
+                # for _ in tqdm(range(train_times)):
+                for _ in range(train_times):
+                    index_batch, batch = self.replay_buffer_worker.get_batch()
+                    priorities, losses, infos = self.training_worker.train_game(batch)
+                    if self.config.PER:
+                        self.replay_buffer_worker.update_priorities(priorities, index_batch)
+                    
+                    self.shared_storage_worker.set_info(
+                        {
+                            "training_step": infos["training_step"],
+                            "lr": infos["rl"],
+                            "total_loss": losses["total_loss"],
+                            "value_loss": losses["value_loss"],
+                            "reward_loss": losses["reward_loss"],
+                            "policy_loss": losses["policy_loss"],
+                            }
+                    )
 
+                    if infos["training_step"] % self.config.checkpoint_interval == 0:
+                        self.shared_storage_worker.set_info(
+                            {
+                                "weights": copy.deepcopy(self.model.get_weights()),
+                                "optimizer_state": copy.deepcopy(
+                                    models.dict_to_cpu(self.optimizer.state_dict())
+                                ),
+                            }
+                        )
+                        if self.config.save_model:
+                            self.shared_storage_worker.save_checkpoint()
+                     
+            self.shared_storage_worker.set_info(
+                {
+                    "episode_length": len(game_history.action_history) - 1,
+                    "total_reward": sum(game_history.reward_history),
+                    "mean_value": numpy.mean(game_history.root_values),
+                    "num_played_games": num_played_games,
+                    "num_played_steps": num_played_steps,
+                    }
+            )
+
+            if log_in_tensorboard: self.logging_loop(counter)
+            
         if self.config.save_model:
             # Persist replay buffer to disk
             print("\n\nPersisting replay buffer games to disk...")
@@ -115,7 +173,7 @@ class MuZero:
             )
 
         self.terminate_workers()
-
+   
     def logging_loop(self, counter):
         """
         Keep track of the training performance.
@@ -196,16 +254,16 @@ class MuZero:
 
 class CPUActor:
     # Trick to force DataParallel to stay on CPU to get weights on CPU even if there is a GPU
-    def __init__(self):
-        pass
+    def __init__(self, config):
+        self.config = config
 
-    def get_initial_weights(self, config):
-        model = models.MuZeroNetwork(config)
+    def initial_model_and_optimizer(self):
+        model = models.MuZeroNetwork(self.config)
         model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
-        target_model = models.MuZeroNetwork(config)
+        target_model = models.MuZeroNetwork(self.config)
         target_model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
         target_model.load_state_dict(model.state_dict())
-        value_normal, reward_normal, state_normal = config.normalization
+        value_normal, reward_normal, state_normal = self.config.normalization
         if value_normal:
             target_model.init_value_norm = model.init_value_norm
             target_model.target_value_norm = model.target_value_norm
@@ -218,7 +276,36 @@ class CPUActor:
         # print("\n", model)
         weigths = model.get_weights()
         summary = str(model).replace("\n", " \n\n")
-        return weigths, summary, model, target_model
+        optimizer = self.initial_optimizer(model)
+        if "cuda" not in str(next(model.parameters()).device):
+            print("You are not training on GPU.\n")
+        return weigths, summary, model, target_model, optimizer
+
+    def initial_optimizer(self, model):
+        # Initialize the optimizer
+        if self.config.optimizer == "SGD":
+            optimizer = torch.optim.SGD(
+                model.parameters(),
+                lr=self.config.lr_init,
+                momentum=self.config.momentum,
+                weight_decay=self.config.weight_decay,
+            )
+        elif self.config.optimizer == "Adam":
+            optimizer = torch.optim.Adam(
+                model.parameters(),
+                lr=self.config.lr_init,
+                weight_decay=self.config.weight_decay,
+            )
+        else:
+            raise NotImplementedError(
+                f"{self.config.optimizer} is not implemented. You can change the optimizer manually in trainer.py."
+            )
+        # if initial_checkpoint["optimizer_state"] is not None:
+        #     print("Loading optimizer...\n")
+        #     self.optimizer.load_state_dict(
+        #         copy.deepcopy(initial_checkpoint["optimizer_state"])
+        #     )
+        return optimizer
 
 
 if __name__ == "__main__": 
