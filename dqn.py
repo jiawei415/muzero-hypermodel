@@ -124,8 +124,25 @@ for counter in range(config.episode):
         total_reward += reward
         episode_length += 1
         num_played_steps += 1
+        if num_played_games >= config.start_train and num_played_steps % config.train_frequency == 0:
+            train_times = config.train_per_paly(num_played_steps)
+            # for _ in tqdm(range(train_times)):
+            for _ in range(train_times):
+                if training_step % config.target_update_freq == 0:
+                    target_network.load_state_dict(q_network.state_dict())
+                s_obs, s_actions, s_rewards, s_next_obses, s_dones = rb.sample(config.batch_size)
+                with torch.no_grad():
+                    target_max = torch.max(target_network(s_next_obses, device), dim=1)[0]
+                    td_target = torch.Tensor(s_rewards).to(device) + config.discount * target_max * (1 - torch.Tensor(s_dones).to(device))
+                old_val = q_network(s_obs, device).gather(1, torch.LongTensor(s_actions).view(-1,1).to(device)).squeeze()
+                total_loss = loss_fn(td_target, old_val)
+                lr = config.lr_init * config.lr_decay_rate ** (training_step / config.lr_decay_steps)
+                optimizer.param_groups[0]["lr"] = lr
+                optimizer.zero_grad()
+                total_loss.backward()
+                optimizer.step()
+                training_step += 1
     num_played_games += 1
-
     print(f'Counter: {counter}/{config.episode}. Last play reward: {total_reward:.2f}. Training step: {training_step}. Played step: {num_played_steps}. Played games: {num_played_games}',)
     writer.add_scalar("1.Total_reward/1.Total_reward", total_reward, counter,)
     writer.add_scalar("1.Total_reward/3.Episode_length", episode_length, counter,)
@@ -139,26 +156,6 @@ for counter in range(config.episode):
     )
     writer.add_scalar("2.Workers/6.Learning_rate", optimizer.param_groups[0]["lr"], counter)
     writer.add_scalar("3.Loss/1.Total_weighted_loss", total_loss, counter)
-
-    if num_played_games % 2 == 0:
-        train_times = config.train_times(num_played_games)
-        # for _ in tqdm(range(train_times)):
-        for _ in range(train_times):
-            if training_step % config.target_update_freq == 0:
-                target_network.load_state_dict(q_network.state_dict())
-            s_obs, s_actions, s_rewards, s_next_obses, s_dones = rb.sample(config.batch_size)
-            with torch.no_grad():
-                target_max = torch.max(target_network(s_next_obses, device), dim=1)[0]
-                td_target = torch.Tensor(s_rewards).to(device) + config.discount * target_max * (1 - torch.Tensor(s_dones).to(device))
-            old_val = q_network(s_obs, device).gather(1, torch.LongTensor(s_actions).view(-1,1).to(device)).squeeze()
-            total_loss = loss_fn(td_target, old_val)
-
-            lr = config.lr_init * config.lr_decay_rate ** (training_step / config.lr_decay_steps)
-            optimizer.param_groups[0]["lr"] = lr
-            optimizer.zero_grad()
-            total_loss.backward()
-            optimizer.step()
-            training_step += 1
 
 game.close()
 writer.close()
