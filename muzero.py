@@ -109,42 +109,40 @@ class MuZero:
                     self.config.temperature_threshold,
                 )
                 num_played_steps += 1
-            num_played_games += 1           
-            self.self_play_worker.close_game()
-            self.replay_buffer_worker.save_game(game_history)
-            
-            if num_played_games >= self.config.start_train and num_played_steps % self.config.train_frequency == 0:
-                train_times = self.config.train_per_paly(num_played_steps)
-                # for _ in tqdm(range(train_times)):
-                for _ in range(train_times):
-                    index_batch, batch = self.replay_buffer_worker.get_batch()
-                    priorities, losses, infos = self.training_worker.train_game(batch)
-                    if self.config.PER:
-                        self.replay_buffer_worker.update_priorities(priorities, index_batch)
-                    
-                    self.shared_storage_worker.set_info(
-                        {
-                            "training_step": infos["training_step"],
-                            "lr": infos["rl"],
-                            "total_loss": losses["total_loss"],
-                            "value_loss": losses["value_loss"],
-                            "reward_loss": losses["reward_loss"],
-                            "policy_loss": losses["policy_loss"],
-                            }
-                    )
-
-                    if infos["training_step"] % self.config.checkpoint_interval == 0:
+                if num_played_games >= self.config.start_train and num_played_steps % self.config.train_frequency == 0:
+                    train_times = self.config.train_per_paly(num_played_steps)
+                    # for _ in tqdm(range(train_times)):
+                    for _ in range(train_times):
+                        index_batch, batch = self.replay_buffer_worker.get_batch()
+                        priorities, losses, infos = self.training_worker.train_game(batch)
+                        if self.config.PER:
+                            self.replay_buffer_worker.update_priorities(priorities, index_batch)
+                        
                         self.shared_storage_worker.set_info(
                             {
-                                "weights": copy.deepcopy(self.model.get_weights()),
-                                "optimizer_state": copy.deepcopy(
-                                    models.dict_to_cpu(self.optimizer.state_dict())
-                                ),
-                            }
+                                "training_step": infos["training_step"],
+                                "lr": infos["rl"],
+                                "total_loss": losses["total_loss"],
+                                "value_loss": losses["value_loss"],
+                                "reward_loss": losses["reward_loss"],
+                                "policy_loss": losses["policy_loss"],
+                                }
                         )
-                        if self.config.save_model:
-                            self.shared_storage_worker.save_checkpoint()
-                     
+                        if infos["training_step"] % self.config.checkpoint_interval == 0:
+                            self.shared_storage_worker.set_info(
+                                {
+                                    "weights": copy.deepcopy(self.model.get_weights()),
+                                    "optimizer_state": copy.deepcopy(
+                                        models.dict_to_cpu(self.optimizer.state_dict())
+                                    ),
+                                }
+                            )
+                            if self.config.save_model:
+                                self.shared_storage_worker.save_checkpoint()
+            
+            num_played_games += 1           
+            self.self_play_worker.close_game()
+            self.replay_buffer_worker.save_game(game_history)            
             self.shared_storage_worker.set_info(
                 {
                     "episode_length": len(game_history.action_history) - 1,
