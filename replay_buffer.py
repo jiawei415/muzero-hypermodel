@@ -14,25 +14,21 @@ class ReplayBuffer:
     Class which run in a dedicated thread to store played games and generate batch.
     """
 
-    def __init__(self, initial_checkpoint, initial_buffer, reanalyse_worker, config):
+    def __init__(self, reanalyse_worker, config):
         self.config = config
-        self.buffer = copy.deepcopy(initial_buffer)
-        self.num_played_games = initial_checkpoint["num_played_games"]
-        self.num_played_steps = initial_checkpoint["num_played_steps"]
+        self.buffer = {}
+        self.num_played_games = 0
+        self.num_played_steps = 1
         self.total_samples = sum(
             [len(game_history.root_values) for game_history in self.buffer.values()]
         )
-        if self.total_samples != 0:
-            print(
-                f"Replay buffer initialized with {self.total_samples} samples ({self.num_played_games} games).\n"
-            )
         self.reanalyse_worker = reanalyse_worker
         self.use_value_noise, self.use_reward_noise = config.use_loss_noise
         # Fix random generator seed
         numpy.random.seed(self.config.seed)
         self.counter = self.config.seed + 1
 
-    def save_game(self, game_history, shared_storage=None):
+    def save_game(self, game_history):
         if self.config.PER:
             if game_history.priorities is not None:
                 # Avoid read only array when loading replay buffer from disk
@@ -61,10 +57,6 @@ class ReplayBuffer:
             del_id = self.num_played_games - len(self.buffer)
             self.total_samples -= len(self.buffer[del_id].root_values)
             del self.buffer[del_id]
-
-        if shared_storage:
-            shared_storage.set_info("num_played_games", self.num_played_games)
-            shared_storage.set_info("num_played_steps", self.num_played_steps)
 
     def get_buffer(self):
         return self.buffer
@@ -348,14 +340,11 @@ class Reanalyse:
     See paper appendix Reanalyse.
     """
 
-    def __init__(self, target_model, initial_checkpoint, shared_storage, config):
+    def __init__(self, target_model, config):
         self.config = config
-        self.shared_storage = shared_storage
-
         # Fix random generator seed
         numpy.random.seed(self.config.seed)
         torch.manual_seed(self.config.seed)
-
         # Import the game class to enable MCTS updates
         game_module = importlib.import_module("games." + self.config.game_filename)
         self.game = game_module.Game()
@@ -363,8 +352,6 @@ class Reanalyse:
         self.target_model = target_model
         self.target_model.eval()
         self.noise_dim = int(self.config.hyper_inp_dim)
-
-        self.num_reanalysed_games = initial_checkpoint["num_reanalysed_games"]
 
     def reanalyse(self, game_history, seed, start, end):
         setup_seed(seed)
@@ -394,9 +381,6 @@ class Reanalyse:
                 True,
             )
             target_game_history.store_search_statistics(root, self.config.action_space)
-
-        self.num_reanalysed_games += 1
-        self.shared_storage.set_info("num_reanalysed_games", self.num_reanalysed_games)
 
         return target_game_history
 
