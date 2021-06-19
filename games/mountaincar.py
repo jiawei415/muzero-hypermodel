@@ -22,6 +22,7 @@ class MuZeroConfig:
         self.reanalyse_num_simulations = 10
         self.target_update_freq = 100
         self.num_unroll_steps = 10
+        self.td_steps = 50  
         self.train_frequency = 100
         self.train_proportion = 1.5
         self.start_train = 1
