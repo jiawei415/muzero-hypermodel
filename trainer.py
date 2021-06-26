@@ -207,9 +207,9 @@ class Trainer:
 
         # Scale the value loss, paper recommends by 0.25 (See paper appendix Reanalyze)
         loss = value_loss * self.config.value_loss_weight + reward_loss + policy_loss
-        if self.config.regularization:
-            reg_loss = self.regularization_loss([value_params, reward_params, reward_params])
-            loss += reg_loss
+        if self.config.reg_loss:
+            reg_loss = self.regularization_loss([value_params, reward_params, state_params])
+            loss += self.config.reg_loss_coef + reg_loss
         if self.config.PER:
             # Correct PER bias by using importance-sampling (IS) weights
             loss *= weight_batch
@@ -259,5 +259,5 @@ class Trainer:
         reg_loss = 0
         for param in params:
             if param is not None:
-                reg_loss += self.config.weight_decay * torch.norm(param, p=p)
+                reg_loss += torch.norm(param, p=p)
         return reg_loss
