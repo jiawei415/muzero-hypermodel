@@ -17,7 +17,8 @@ class MuZeroConfig:
         self.priormodel = [1, 0, 0]
         self.hypermodel = [1, 1, 0] 
         self.normalization = [1, 1, 0] 
-        self.regularization = False
+        self.reg_loss = True
+        self.reg_loss_coef = 1
         self.hyper_inp_dim = 32
         self.num_simulations = 50  
         self.reanalyse_num_simulations = 10
@@ -30,7 +31,7 @@ class MuZeroConfig:
 
         # Fully Connected Network
         self.stacked_observations = 0
-        self.use_representation = False
+        self.use_representation = True
         self.encoding_size = 8
         self.fc_representation_layers = []  # Define the hidden layers in the representation network
         self.fc_dynamics_layers = [16]  # Define the hidden layers in the dynamics network
