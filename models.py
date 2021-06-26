@@ -91,17 +91,12 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         if self.state_hyper:
             print(f"use dynamics state hypermodel!")
             layers = [encoding_size + self.action_space_size] + fc_dynamics_layers + [encoding_size]
-            self.state_shapes = []
-            self.state_sizes = []
-            for i in range(len(layers)-1):
-                self.state_shapes.extend([(layers[i], layers[i+1]), (1, layers[i+1])])
-                self.state_sizes.extend([layers[i] * layers[i+1], layers[i+1]])
+            self.state_shapes, self.state_sizes = self.gen_shape_size(layers)
             state_params_inp_dim = config.hyper_inp_dim
             state_params_out_dim = sum(self.state_sizes)
             self.state_params = torch.nn.Linear(state_params_inp_dim, state_params_out_dim)
             if self.state_normal:
-                self.init_state_norm = []
-                self.target_state_norm = []
+                self.init_state_norm, self.target_state_norm = [], []
         else:
             self.dynamics_encoded_state_network = torch.nn.DataParallel(
                 mlp(
@@ -114,17 +109,12 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         if self.reward_hyper:
             print(f"use dynamics reward hypermodel!")
             layers = [encoding_size] + fc_reward_layers + [self.full_support_size]
-            self.reward_shapes = []
-            self.reward_sizes = []
-            for i in range(len(layers)-1):
-                self.reward_shapes.extend([(layers[i], layers[i+1]), (1, layers[i+1])])
-                self.reward_sizes.extend([layers[i] * layers[i+1], layers[i+1]])
+            self.reward_shapes, self.reward_sizes = self.gen_shape_size(layers)
             reward_params_inp_dim = config.hyper_inp_dim
             reward_params_out_dim = sum(self.reward_sizes)
             self.reward_params = torch.nn.Linear(reward_params_inp_dim, reward_params_out_dim)
             if self.reward_normal:
-                self.init_reward_norm = []
-                self.target_reward_norm = []
+                self.init_reward_norm, self.target_reward_norm = [], []
         else:
             self.dynamics_reward_network = torch.nn.DataParallel(
                 mlp(encoding_size, fc_reward_layers, self.full_support_size)
@@ -137,42 +127,24 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         if self.value_hyper:
             print(f"use prediction value hypermodel!")
             layers = [encoding_size] + fc_value_layers + [self.full_support_size]
-            self.value_shapes = []
-            self.value_sizes = []
-            for i in range(len(layers)-1):
-                self.value_shapes.extend([(layers[i], layers[i+1]), (1, layers[i+1])])
-                self.value_sizes.extend([layers[i] * layers[i+1], layers[i+1]])
+            self.value_shapes, self.value_sizes = self.gen_shape_size(layers)
             value_params_inp_dim = config.hyper_inp_dim
             value_params_out_dim = sum(self.value_sizes)
             self.value_params = torch.nn.Linear(value_params_inp_dim, value_params_out_dim)
             if self.value_normal:
-                self.init_value_norm = []
-                self.target_value_norm = []
+                self.init_value_norm, self.target_value_norm = [], []
         else:
             self.prediction_value_network = torch.nn.DataParallel(
                 mlp(encoding_size, fc_value_layers, self.full_support_size)
             )
 
-    def prediction(self, encoded_state, noise_z):
-        policy_logits = self.prediction_policy_network(encoded_state)
-        if self.value_hyper:
-            value_params = self.value_params(noise_z)
-            split_params = self.split_params(value_params, "value")
-            if self.value_normal:
-                if len(self.init_value_norm) == 0:
-                    self.gen_norm(split_params, "value")
-                split_params = self.get_normal_params(split_params, "value")
-            inp = encoded_state.unsqueeze(dim=1)
-            for i in range(0, len(split_params), 2):
-                inp = torch.bmm(inp, split_params[i]) + split_params[i+1]
-                if i != len(split_params) - 2:
-                    inp = torch.nn.functional.relu(inp)
-            value = inp.squeeze(dim=1)
-        else:
-            value = self.prediction_value_network(encoded_state)
-            value_params = None
-        return policy_logits, value, value_params
- 
+    def gen_shape_size(self, layers):
+        shapes = []
+        sizes = []
+        for i in range(len(layers)-1):
+            shapes.extend([(layers[i], layers[i+1]), (1, layers[i+1])])
+            sizes.extend([layers[i] * layers[i+1], layers[i+1]])
+        return shapes, sizes
 
     def representation(self, observation):
         encoded_state = self.representation_network(
@@ -188,6 +160,21 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         ) / scale_encoded_state
         return encoded_state_normalized
 
+    def prediction(self, encoded_state, noise_z):
+        policy_logits = self.prediction_policy_network(encoded_state)
+        if self.value_hyper:
+            value_params = self.value_params(noise_z)
+            split_params = self.split_params(value_params, "value")
+            if self.value_normal:
+                if len(self.init_value_norm) == 0:
+                    self.gen_norm(split_params, "value")
+                split_params = self.get_normal_params(split_params, "value")
+            value = self.basemodel_forward(encoded_state, split_params)
+        else:
+            value = self.prediction_value_network(encoded_state)
+            value_params = None
+        return policy_logits, value, value_params
+ 
     def dynamics(self, encoded_state, action, noise_z):
         # Stack encoded_state with a game specific one hot encoded action (See paper appendix Network Architecture)
         action_one_hot = (
@@ -205,12 +192,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
                 if len(self.init_state_norm) == 0:
                     self.gen_norm(split_params, "state")
                 split_params = self.get_normal_params(split_params, "state")
-            inp = x.unsqueeze(dim=1)
-            for i in range(0, len(split_params), 2):
-                inp = torch.bmm(inp, split_params[i]) + split_params[i+1]
-                if i != len(split_params) - 2:
-                    inp = torch.nn.functional.relu(inp)
-            next_encoded_state = inp.squeeze(dim=1)
+            next_encoded_state = self.basemodel_forward(x, split_params)
         else:
             next_encoded_state = self.dynamics_encoded_state_network(x)
             state_params = None
@@ -222,12 +204,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
                 if len(self.init_reward_norm) == 0:
                     self.gen_norm(split_params, "reward")
                 split_params = self.get_normal_params(split_params, "reward")
-            inp = next_encoded_state.unsqueeze(dim=1)
-            for i in range(0, len(split_params), 2):
-                inp = torch.bmm(inp, split_params[i]) + split_params[i+1]
-                if i != len(split_params) - 2:
-                    inp = torch.nn.functional.relu(inp)
-            reward = inp.squeeze(dim=1)
+            reward = self.basemodel_forward(next_encoded_state, split_params)
         else:
             reward = self.dynamics_reward_network(next_encoded_state)
             reward_params = None
@@ -242,6 +219,14 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         ) / scale_next_encoded_state
 
         return next_encoded_state_normalized, reward, state_params, reward_params
+
+    def basemodel_forward(self, inputs, params):
+        inputs = inputs.unsqueeze(dim=1)
+        for i in range(0, len(params), 2):
+            inputs = torch.bmm(inputs, params[i]) + params[i+1]
+            if i != len(params) - 2:
+                inputs = torch.nn.functional.relu(inputs)
+        return inputs.squeeze(dim=1)
 
     def debug(self, noise_z):
         value_params = self.value_params(noise_z) if self.value_hyper else None
