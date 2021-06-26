@@ -1,5 +1,6 @@
 import math
 import torch
+import numpy
 from abc import ABC, abstractmethod
 
 class MuZeroNetwork:
@@ -69,6 +70,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         super().__init__()
         self.action_space_size = action_space_size
         self.full_support_size = 2 * support_size + 1
+        self.value_prior, self.reward_prior, self.state_prior = config.priormodel
         self.value_hyper, self.reward_hyper, self.state_hyper = config.hypermodel
         self.value_normal, self.reward_normal, self.state_normal = config.normalization
         self.config = config
@@ -95,6 +97,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             state_params_inp_dim = config.hyper_inp_dim
             state_params_out_dim = sum(self.state_sizes)
             self.state_params = torch.nn.Linear(state_params_inp_dim, state_params_out_dim)
+            self.state_prior_params = self.gen_prior_params(state_params_inp_dim, state_params_out_dim)
             if self.state_normal:
                 self.init_state_norm, self.target_state_norm = [], []
         else:
@@ -113,6 +116,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             reward_params_inp_dim = config.hyper_inp_dim
             reward_params_out_dim = sum(self.reward_sizes)
             self.reward_params = torch.nn.Linear(reward_params_inp_dim, reward_params_out_dim)
+            self.reward_prior_params = self.gen_prior_params(reward_params_inp_dim, reward_params_out_dim)
             if self.reward_normal:
                 self.init_reward_norm, self.target_reward_norm = [], []
         else:
@@ -131,6 +135,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             value_params_inp_dim = config.hyper_inp_dim
             value_params_out_dim = sum(self.value_sizes)
             self.value_params = torch.nn.Linear(value_params_inp_dim, value_params_out_dim)
+            self.value_prior_params = self.gen_prior_params(value_params_inp_dim, value_params_out_dim)
             if self.value_normal:
                 self.init_value_norm, self.target_value_norm = [], []
         else:
@@ -146,6 +151,14 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             sizes.extend([layers[i] * layers[i+1], layers[i+1]])
         return shapes, sizes
 
+    def gen_prior_params(self, inp_dim, out_dim):
+        normal_deviates = numpy.random.standard_normal((out_dim, inp_dim))
+        radius = numpy.linalg.norm(normal_deviates, axis=1, keepdims=True)
+        prior_B = normal_deviates / radius
+        prior_D = numpy.eye(out_dim)
+        prior_params = torch.from_numpy(prior_D.dot(prior_B)).float()
+        return prior_params.T
+    
     def representation(self, observation):
         encoded_state = self.representation_network(
             observation.view(observation.shape[0], -1)
@@ -164,7 +177,9 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         policy_logits = self.prediction_policy_network(encoded_state)
         if self.value_hyper:
             value_params = self.value_params(noise_z)
-            split_params = self.split_params(value_params, "value")
+            value_prior_params = torch.mm(noise_z, self.value_prior_params)
+            value_params_ = value_params + value_prior_params if self.value_prior else value_params
+            split_params = self.split_params(value_params_, "value")
             if self.value_normal:
                 if len(self.init_value_norm) == 0:
                     self.gen_norm(split_params, "value")
@@ -187,7 +202,9 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
 
         if self.state_hyper:
             state_params = self.state_params(noise_z)
-            split_params = self.split_params(state_params, "state")
+            state_prior_params = torch.mm(noise_z, self.state_prior_params)
+            state_params_ = state_params + state_prior_params if self.state_prior else state_params
+            split_params = self.split_params(state_params_, "state")
             if self.state_normal:
                 if len(self.init_state_norm) == 0:
                     self.gen_norm(split_params, "state")
@@ -199,6 +216,8 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
 
         if self.reward_hyper:
             reward_params = self.reward_params(noise_z)
+            reward_prior_params = torch.mm(noise_z, self.reward_prior_params)
+            reward_params_ = reward_params + reward_prior_params if self.reward_prior else reward_params
             split_params = self.split_params(reward_params, "reward")
             if self.reward_normal:
                 if len(self.init_reward_norm) == 0:
@@ -313,6 +332,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
                 self.init_value_norm.append(torch.norm(param).detach().numpy())
                 self.target_value_norm.append(torch.norm(torch.nn.init.xavier_normal_(
                     torch.empty(size=param.size()))).detach().numpy())
+
 
 def mlp(
     input_size,

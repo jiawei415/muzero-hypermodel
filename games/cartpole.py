@@ -14,6 +14,7 @@ class MuZeroConfig:
         # Important Config
         # value reward state
         self.use_loss_noise = [1, 0]
+        self.priormodel = [1, 0, 0]
         self.hypermodel = [1, 1, 0] 
         self.normalization = [1, 1, 0] 
         self.regularization = False
