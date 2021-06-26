@@ -257,9 +257,22 @@ class CPUActor:
 
     def initial_model_and_optimizer(self):
         model = models.MuZeroNetwork(self.config)
-        target_model = copy.deepcopy(model)
         model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
-        target_model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+        target_model = models.MuZeroNetwork(self.config)
+        target_model.load_state_dict(model.state_dict())
+        value_normal, reward_normal, state_normal = self.config.normalization
+        if value_normal:
+            target_model.init_value_norm = model.init_value_norm
+            target_model.target_value_norm = model.target_value_norm
+            target_model.value_prior_params = model.value_prior_params
+        if reward_normal:
+            target_model.init_reward_norm = model.init_reward_norm
+            target_model.target_reward_norm = model.target_reward_norm
+            target_model.reward_prior_params = model.reward_prior_params
+        if state_normal:
+            target_model.init_state_norm = model.init_state_norm
+            target_model.target_state_norm = model.target_state_norm
+            target_model.state_prior_params = model.state_prior_params
         # print("\n", model)
         weigths = model.get_weights()
         summary = str(model).replace("\n", " \n\n")
