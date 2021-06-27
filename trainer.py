@@ -33,7 +33,7 @@ class Trainer:
         if self.training_step % self.config.checkpoint_interval == 0:
             for i, (name, param) in enumerate(self.model.named_parameters()):
                 if "bias" not in name and "param" in name:
-                    self.writer.add_histogram(f"1.Model/{name}", param)
+                    if self.config.save_histogram_log: self.writer.add_histogram(f"1.Model/{name}", param)
                     self.writer.add_scalar(
                         f"4.Variance/{name}", torch.std(param), self.training_step,
                     )
@@ -41,7 +41,7 @@ class Trainer:
                 params = self.model.debug(self.debug_noise)
             for name, param in params.items():
                 if param is not None:
-                    self.writer.add_histogram(f"3.Debug/{name}", param)
+                    if self.config.save_histogram_log: self.writer.add_histogram(f"3.Debug/{name}", param)
                     self.writer.add_scalar(
                         f"5.Debug/{name}", torch.std(param), self.training_step
                     )
@@ -100,7 +100,7 @@ class Trainer:
         value_scalar.append(models.support_to_scalar(value, self.config.support_size))
         reward_scalar.append(models.support_to_scalar(reward, self.config.support_size))
         if value_params is not None and self.training_step % self.config.checkpoint_interval == 0:
-            self.writer.add_histogram(f"2.Hypermodel/value_params", value_params)
+            if self.config.save_histogram_log: self.writer.add_histogram(f"2.Hypermodel/value_params", value_params)
             self.writer.add_scalar(
                 f"4.Variance/value_params", torch.std(value_params), self.training_step,
             )
@@ -116,12 +116,12 @@ class Trainer:
             predictions.append((value, reward, policy_logits))
         # predictions: num_unroll_steps+1, 3, batch, 2*support_size+1 | 2*support_size+1 | 9 (according to the 2nd dim)
         if state_params is not None and self.training_step % self.config.checkpoint_interval == 0:
-            self.writer.add_histogram(f"2.Hypermodel/state_params", state_params)
+            if self.config.save_histogram_log: self.writer.add_histogram(f"2.Hypermodel/state_params", state_params)
             self.writer.add_scalar(
                 f"4.Variance/state_params", torch.std(state_params), self.training_step,
             )
         if reward_params is not None and self.training_step % self.config.checkpoint_interval == 0:
-            self.writer.add_histogram(f"2.Hypermodel/reward_params", reward_params)
+            if self.config.save_histogram_log: self.writer.add_histogram(f"2.Hypermodel/reward_params", reward_params)
             self.writer.add_scalar(
                 f"4.Variance/reward_params", torch.std(reward_params), self.training_step,
             )
