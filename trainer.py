@@ -259,5 +259,5 @@ class Trainer:
         reg_loss = 0
         for param in params:
             if param is not None:
-                reg_loss += torch.norm(param, p=p)
+                reg_loss += torch.norm(param, p=p).square()
         return reg_loss
