@@ -364,7 +364,7 @@ class Reanalyse:
         else:
             target_game_history.child_visits[start:] = []
             target_game_history.root_values[start:] = []
-        std = self.config.unit_sphere_std
+        std = self.config.normal_noise_std
         target_noise_z = numpy.random.normal(0, std, [1, self.noise_dim])
         target_game_history.noise_history = target_noise_z
         for i in range(start, end):
