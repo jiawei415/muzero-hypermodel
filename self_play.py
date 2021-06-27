@@ -31,7 +31,8 @@ class SelfPlay:
         assert (
             numpy.array(observation).shape == self.config.observation_shape
         ), f"Observation should match the observation_shape defined in MuZeroConfig. Expected {self.config.observation_shape} but got {numpy.array(observation).shape}."
-        noise_z = numpy.random.normal(0, 1, [1, self.noise_dim])
+        std = self.config.normal_noise_std
+        noise_z = numpy.random.normal(0, std, [1, self.noise_dim])
         if render:
             self.game.render()
         game_history = GameHistory()
@@ -112,7 +113,8 @@ class SelfPlay:
         self.game.close()
 
     def sample_unit_sphere(self):
-        noise = numpy.random.normal(0, 1, [1, self.noise_dim])
+        std = self.config.unit_sphere_std
+        noise = numpy.random.normal(0, std, [1, self.noise_dim])
         noise /= numpy.sqrt((noise**2).sum())
         return noise
 

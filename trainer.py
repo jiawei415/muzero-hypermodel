@@ -18,8 +18,8 @@ class Trainer:
         self.target_model = target_model
         self.optimizer = optimizer
         self.writer = writer
-        self.training_step = 0 
-        self.debug_noise = torch.normal(0, 1, [1, int(self.config.hyper_inp_dim)])
+        self.training_step = 0
+        self.debug_noise = torch.normal(0, self.config.normal_noise_std, [1, int(self.config.hyper_inp_dim)])
 
     def train_game(self, batch):
         if self.training_step % self.config.target_update_freq == 0:
@@ -209,7 +209,7 @@ class Trainer:
         loss = value_loss * self.config.value_loss_weight + reward_loss + policy_loss
         if self.config.reg_loss:
             reg_loss = self.regularization_loss([value_params, reward_params, state_params])
-            loss += self.config.reg_loss_coef + reg_loss
+            loss += self.config.reg_loss_coef * reg_loss
         if self.config.PER:
             # Correct PER bias by using importance-sampling (IS) weights
             loss *= weight_batch
