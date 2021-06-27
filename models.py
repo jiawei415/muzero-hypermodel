@@ -218,7 +218,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             reward_params = self.reward_params(noise_z)
             reward_prior_params = torch.mm(noise_z, self.reward_prior_params)
             reward_params_ = reward_params + reward_prior_params if self.reward_prior else reward_params
-            split_params = self.split_params(reward_params, "reward")
+            split_params = self.split_params(reward_params_, "reward")
             if self.reward_normal:
                 if len(self.init_reward_norm) == 0:
                     self.gen_norm(split_params, "reward")
