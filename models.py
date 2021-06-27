@@ -152,7 +152,8 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         return shapes, sizes
 
     def gen_prior_params(self, inp_dim, out_dim):
-        normal_deviates = numpy.random.standard_normal((out_dim, inp_dim))
+        std = self.config.prior_model_std
+        normal_deviates = numpy.random.standard_normal((out_dim, inp_dim)) * std
         radius = numpy.linalg.norm(normal_deviates, axis=1, keepdims=True)
         prior_B = normal_deviates / radius
         prior_D = numpy.eye(out_dim)

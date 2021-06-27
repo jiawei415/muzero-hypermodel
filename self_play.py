@@ -113,7 +113,7 @@ class SelfPlay:
         self.game.close()
 
     def sample_unit_sphere(self):
-        std = self.config.unit_sphere_std
+        std = self.config.target_noise_std
         noise = numpy.random.normal(0, std, [1, self.noise_dim])
         noise /= numpy.sqrt((noise**2).sum())
         return noise
