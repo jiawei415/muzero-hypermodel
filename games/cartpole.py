@@ -19,11 +19,10 @@ class MuZeroConfig:
         self.normalization = [1, 1, 0] 
         self.reg_loss = True
         self.reg_loss_coef = 1
-        self.loss_noise_coef = 1
-        self.hyper_inp_dim = 32
         self.normal_noise_std = 1
-        self.target_noise_std = 0.1
+        self.target_noise_std = 1
         self.prior_model_std = 1
+        self.hyper_inp_dim = 32
         self.num_simulations = 50  
         self.reanalyse_num_simulations = 10
         self.target_update_freq = 100

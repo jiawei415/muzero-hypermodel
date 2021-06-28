@@ -298,9 +298,9 @@ class ReplayBuffer:
             if any(self.config.use_loss_noise):
                 target_noise = self.compute_target_noise(game_history, current_index)
                 if self.use_value_noise:
-                    value += self.config.loss_noise_coef * target_noise
+                    value += target_noise
                 if self.use_reward_noise:
-                    reward += self.config.loss_noise_coef * target_noise
+                    reward += target_noise
             
             if current_index < game_history_len:
                 target_values.append(value)
@@ -364,8 +364,7 @@ class Reanalyse:
         else:
             target_game_history.child_visits[start:] = []
             target_game_history.root_values[start:] = []
-        std = self.config.normal_noise_std
-        target_noise_z = numpy.random.normal(0, std, [1, self.noise_dim])
+        target_noise_z = numpy.random.normal(0, 1, [1, self.noise_dim]) * self.config.normal_noise_std
         target_game_history.noise_history = target_noise_z
         for i in range(start, end):
             stacked_observations = target_game_history.get_stacked_observations(

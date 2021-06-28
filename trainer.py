@@ -19,7 +19,7 @@ class Trainer:
         self.optimizer = optimizer
         self.writer = writer
         self.training_step = 0
-        self.debug_noise = torch.normal(0, self.config.normal_noise_std, [1, int(self.config.hyper_inp_dim)])
+        self.debug_noise = torch.normal(0, 1, [1, int(self.config.hyper_inp_dim)]) * self.config.normal_noise_std
 
     def train_game(self, batch):
         if self.training_step % self.config.target_update_freq == 0:
