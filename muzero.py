@@ -61,10 +61,15 @@ class MuZero:
     def init_workers(self, log_in_tensorboard=True):
         if log_in_tensorboard or self.config.save_model:
             os.makedirs(self.config.results_path, exist_ok=True)
-            # self.test_worker = self_play.SelfPlay(self.checkpoint, self.Game, self.config, self.config.seed)
-            self.writer = SummaryWriter(self.config.results_path)
+            config_logs_path = self.config.results_path + "/config_logs.csv"
+            hp_table = []
+            config_logs = pd.DataFrame(columns=["key", "value"])
+            for i, (key, value) in enumerate(self.config.__dict__.items()):
+                hp_table.extend([f"| {key} | {value} |"])
+                config_logs.loc[i] = [key, value]
+            config_logs.to_csv(config_logs_path, sep="\t", index=False)
             print("\nTraining...\nRun tensorboard --logdir ./results and go to http://localhost:6006/ to see in real time the training performance.\n")
-            hp_table = [f"| {key} | {value} |" for key, value in self.config.__dict__.items()]
+            self.writer = SummaryWriter(self.config.results_path)
             self.writer.add_text("Hyperparameters", "| Parameter | Value |\n|-------|-------|\n" + "\n".join(hp_table),)
             self.writer.add_text("Model summary", self.summary,)
             self.keys = [
