@@ -11,6 +11,7 @@ import argparse
 import importlib
 import collections
 import numpy as np
+import pandas as pd
 
 
 if __name__ == "__main__":
@@ -38,11 +39,32 @@ writer = SummaryWriter(results_path)
 hp_table = [f"| {key} | {value} |" for key, value in config.__dict__.items()]
 writer.add_text("Hyperparameters", "| Parameter | Value |\n|-------|-------|\n" + "\n".join(hp_table),)
 
+training_logs = {
+    "Total_reward": [], 
+    "Episode_length": [], 
+    "Self_played_games":[],
+    "Training_steps":[],
+    "Self_played_steps":[],
+    "Total_weighted_loss":[],
+}
+training_logs = pd.DataFrame(training_logs, 
+    columns = [
+        "Total_reward", 
+        "Episode_length", 
+        "Self_played_games",
+        "Training_steps",
+        "Self_played_steps",
+        "Total_weighted_loss",
+        ])
+training_logs_path = results_path + "/training_logs.csv"
+training_logs.to_csv(training_logs_path, sep="\t", index=False)
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 random.seed(config.seed)
 np.random.seed(config.seed)
 torch.manual_seed(config.seed)
 torch.backends.cudnn.deterministic = True
+
 
 # modified from https://github.com/seungeunrho/minimalRL/blob/master/dqn.py#
 class ReplayBuffer():
@@ -142,6 +164,7 @@ for counter in range(config.episode):
                 total_loss.backward()
                 optimizer.step()
                 training_step += 1
+                total_loss = total_loss.item()
     num_played_games += 1
     print(f'Counter: {counter}/{config.episode}. Last play reward: {total_reward:.2f}. Training step: {training_step}. Played step: {num_played_steps}. Played games: {num_played_games}',)
     writer.add_scalar("1.Total_reward/1.Total_reward", total_reward, counter,)
@@ -156,6 +179,8 @@ for counter in range(config.episode):
     )
     writer.add_scalar("2.Workers/6.Learning_rate", optimizer.param_groups[0]["lr"], counter)
     writer.add_scalar("3.Loss/1.Total_weighted_loss", total_loss, counter)
-
+    training_log = [total_reward, episode_length, num_played_games, training_step, num_played_steps, total_loss]
+    training_logs.loc[counter] = training_log
+    training_logs.to_csv(training_logs_path, sep="\t", index=False)
 game.close()
 writer.close()
