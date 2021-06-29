@@ -39,15 +39,7 @@ writer = SummaryWriter(results_path)
 hp_table = [f"| {key} | {value} |" for key, value in config.__dict__.items()]
 writer.add_text("Hyperparameters", "| Parameter | Value |\n|-------|-------|\n" + "\n".join(hp_table),)
 
-training_logs = {
-    "Total_reward": [], 
-    "Episode_length": [], 
-    "Self_played_games":[],
-    "Training_steps":[],
-    "Self_played_steps":[],
-    "Total_weighted_loss":[],
-}
-training_logs = pd.DataFrame(training_logs, 
+training_logs = pd.DataFrame(
     columns = [
         "Total_reward", 
         "Episode_length", 
@@ -56,6 +48,7 @@ training_logs = pd.DataFrame(training_logs,
         "Self_played_steps",
         "Total_weighted_loss",
         ])
+
 training_logs_path = results_path + "/training_logs.csv"
 training_logs.to_csv(training_logs_path, sep="\t", index=False)
 
