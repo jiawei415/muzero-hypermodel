@@ -4,6 +4,7 @@ import numpy
 import torch
 import models
 import importlib
+import pandas as pd
 
 class SelfPlay:
     """
@@ -20,7 +21,13 @@ class SelfPlay:
         torch.manual_seed(self.config.seed)
         self.model = model
         self.noise_dim = int(self.config.hyper_inp_dim)
-        self.writer = writer
+        self.writer = writer 
+        columns = []
+        for i in self.game.legal_actions():
+            columns.extend([f"mcts_action_{i}", f"model_action_{i}"])
+        self.action_logs_path = self.config.results_path + "/action_logs.csv"
+        self.action_logs = pd.DataFrame(columns=columns)
+        self.action_logs.to_csv(self.action_logs_path, sep="\t", index=False)
         self.counter = 0
         
     def start_game(self, render=False):
@@ -78,6 +85,7 @@ class SelfPlay:
         
             # Debug for action pi of initial state
             if len(game_history.observation_history) == 1:
+                action_log = []
                 debug_obs = (
                     torch.tensor(stacked_observations)
                     .float()
@@ -95,7 +103,10 @@ class SelfPlay:
                     self.writer.add_scalar(
                         f"5.Debug/model_action{i}", debug_policy[i], self.counter
                     )
-                    self.counter += 1
+                    action_log.extend([root.children[i].prior, debug_policy[i].numpy()])
+                self.action_logs.loc[self.counter] = action_log
+                self.action_logs.to_csv(self.action_logs_path, sep="\t", index=False)
+                self.counter += 1
                         
             observation, reward, done = self.game.step(action)
             game_history.store_search_statistics(root, self.config.action_space)

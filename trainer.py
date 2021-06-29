@@ -2,6 +2,7 @@ import copy
 import numpy
 import torch
 import models
+import pandas as pd
 
 class Trainer:
     """
@@ -20,6 +21,10 @@ class Trainer:
         self.writer = writer
         self.training_step = 0
         self.debug_noise = torch.normal(0, 1, [1, int(self.config.hyper_inp_dim)]) * self.config.normal_noise_std
+        self.variance_logs_path = self.config.results_path + "/variance_logs.csv"
+        self.variance_logs = pd.DataFrame(columns=["training_step", "value_params", "reward_params", "state_params", "value_scalar", "reward_scalar"])
+        self.variance_logs.to_csv(self.variance_logs_path, sep="\t", index=False)
+        self.counter = 0
 
     def train_game(self, batch):
         if self.training_step % self.config.target_update_freq == 0:
@@ -62,6 +67,7 @@ class Trainer:
             weight_batch,
             gradient_scale_batch,
         ) = batch
+        variance_log = [0, 0, 0, 0, 0, 0]
 
         # Keep values as scalars for calculating the priorities for the prioritized replay
         target_value_scalar = numpy.array(target_value, dtype="float32")
@@ -104,6 +110,7 @@ class Trainer:
             self.writer.add_scalar(
                 f"4.Variance/value_params", torch.std(value_params), self.training_step,
             )
+            variance_log[1] = torch.std(value_params).detach().numpy()
         predictions = [(value, reward, policy_logits)]
         for i in range(1, action_batch.shape[1]):
             value, reward, policy_logits, hidden_state, value_params, state_params, reward_params = self.model.recurrent_inference(
@@ -115,16 +122,18 @@ class Trainer:
             hidden_state.register_hook(lambda grad: grad * 0.5)
             predictions.append((value, reward, policy_logits))
         # predictions: num_unroll_steps+1, 3, batch, 2*support_size+1 | 2*support_size+1 | 9 (according to the 2nd dim)
-        if state_params is not None and self.training_step % self.config.checkpoint_interval == 0:
-            if self.config.save_histogram_log: self.writer.add_histogram(f"2.Hypermodel/state_params", state_params)
-            self.writer.add_scalar(
-                f"4.Variance/state_params", torch.std(state_params), self.training_step,
-            )
         if reward_params is not None and self.training_step % self.config.checkpoint_interval == 0:
             if self.config.save_histogram_log: self.writer.add_histogram(f"2.Hypermodel/reward_params", reward_params)
             self.writer.add_scalar(
                 f"4.Variance/reward_params", torch.std(reward_params), self.training_step,
             )
+            variance_log[2] = torch.std(reward_params).detach().numpy()
+        if state_params is not None and self.training_step % self.config.checkpoint_interval == 0:
+            if self.config.save_histogram_log: self.writer.add_histogram(f"2.Hypermodel/state_params", state_params)
+            self.writer.add_scalar(
+                f"4.Variance/state_params", torch.std(state_params), self.training_step,
+            )
+            variance_log[3] = torch.std(state_params).detach().numpy()
         value_scalar = torch.cat(value_scalar, dim=1)
         reward_scalar = torch.cat(reward_scalar, dim=1)
         if self.training_step % self.config.checkpoint_interval == 0:
@@ -134,6 +143,13 @@ class Trainer:
             self.writer.add_scalar(
                 f"4.Variance/reward", torch.std(reward_scalar), self.training_step,
             )
+            variance_log[4] = torch.std(value_scalar).detach().numpy()
+            variance_log[5] = torch.std(reward_scalar).detach().numpy()
+        if self.training_step % self.config.checkpoint_interval == 0:
+            variance_log[0] = self.training_step
+            self.variance_logs.loc[self.counter] = variance_log
+            self.variance_logs.to_csv(self.variance_logs_path, sep="\t", index=False)
+            self.counter += 1
 
         ## Compute losses
         value_loss, reward_loss, policy_loss = (0, 0, 0)

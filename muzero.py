@@ -8,6 +8,7 @@ import torch
 import pickle
 import warnings
 import importlib
+import pandas as pd
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 import models
@@ -15,7 +16,6 @@ import trainer
 import self_play
 import replay_buffer
 import shared_storage
-from self_play import GameHistory
 
 class MuZero:
     def __init__(self, game_name, config=None, split_resources_in=1):
@@ -83,6 +83,9 @@ class MuZero:
                 "num_played_steps",
                 "num_reanalysed_games",
             ]
+            self.training_logs_path = self.config.results_path + "/training_logs.csv"
+            self.training_logs = pd.DataFrame(columns=self.keys)
+            self.training_logs.to_csv(self.training_logs_path, sep="\t", index=False)
 
         # Initialize workers
         self.shared_storage_worker = shared_storage.SharedStorage(self.checkpoint, self.config)
@@ -178,7 +181,26 @@ class MuZero:
         """
         # Updating the training performance
         info = self.shared_storage_worker.get_info(self.keys)
+        training_log = []
         try:
+            training_log = [
+                info["total_reward"],
+                info["muzero_reward"],
+                info["opponent_reward"],
+                info["episode_length"],
+                info["mean_value"],
+                info["training_step"],
+                info["lr"],
+                info["total_loss"],
+                info["value_loss"],
+                info["reward_loss"],
+                info["policy_loss"],
+                info["num_played_games"],
+                info["num_played_steps"],
+                info["num_reanalysed_games"],
+            ]
+            self.training_logs.loc[counter] = training_log
+            self.training_logs.to_csv(self.training_logs_path, sep="\t", index=False)
             self.writer.add_scalar(
                 "1.Total_reward/1.Total_reward", info["total_reward"], counter,
             )
