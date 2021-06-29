@@ -253,7 +253,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         state_params = self.state_params(noise_z) if self.state_hyper else None
         reward_params = self.reward_params(noise_z) if self.reward_hyper else None
 
-        return {"value_params": value_params, "state_params": state_params, "reward_params": reward_params}
+        return {"value_params": value_params, "reward_params": reward_params, "state_params": state_params, }
 
     def initial_inference(self, observation, noise_z):
         if not self.config.use_representation and self.config.stacked_observations == 0:
@@ -272,13 +272,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             )
         )
 
-        return (
-            value,
-            reward,
-            policy_logits,
-            encoded_state,
-            value_params,
-        )
+        return value, reward, policy_logits, encoded_state, value_params
 
     def recurrent_inference(self, encoded_state, action, noise_z):
         next_encoded_state, reward, state_params, reward_params = self.dynamics(encoded_state, action, noise_z)

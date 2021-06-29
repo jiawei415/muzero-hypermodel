@@ -32,7 +32,7 @@ class Trainer:
             self.target_model.load_state_dict(self.model.state_dict())
         self.model.train()
         self.update_lr()
-        priorities, losses = self.update_weights(batch)
+        priorities, losses, hyper_params, others = self.update_weights(batch)
         infos = {"training_step": self.training_step, "rl": self.optimizer.param_groups[0]["lr"]}
         
         if self.training_step % self.config.checkpoint_interval == 0:
@@ -42,21 +42,35 @@ class Trainer:
                     self.writer.add_scalar(
                         f"4.Variance/{name}", torch.std(param), self.training_step,
                     )
+            for i, (name, hyper_param) in enumerate(hyper_params.items()):
+                if hyper_param is not None:
+                    if self.config.save_histogram_log: self.writer.add_histogram(f"2.Hypermodel/{name}", hyper_param)
+                    self.writer.add_scalar(
+                        f"4.Variance/{name}", torch.std(hyper_param), self.training_step,
+                    )
             with torch.no_grad():
-                params = self.model.debug(self.debug_noise)
-            for name, param in params.items():
+                debug_params = self.model.debug(self.debug_noise)
+            variance_log = [self.training_step, 0, 0, 0, 0, 0]
+            for i, (name, param) in enumerate(debug_params.items()):
                 if param is not None:
                     if self.config.save_histogram_log: self.writer.add_histogram(f"3.Debug/{name}", param)
                     self.writer.add_scalar(
                         f"5.Debug/{name}", torch.std(param), self.training_step
                     )
+                    variance_log[i+1] = torch.std(param).detach().numpy()
+            for i, (k, v) in enumerate(others.items()):
+                self.writer.add_scalar(f"4.Variance/{k}", v, self.training_step,) 
+                variance_log[len(debug_params)+i+1] = v
+            self.variance_logs.loc[self.counter] = variance_log
+            self.variance_logs.to_csv(self.variance_logs_path, sep="\t", index=False)
+            self.counter += 1          
+        self.training_step += 1        
         return priorities, losses, infos
 
     def update_weights(self, batch):
         """
         Perform one training step.
         """
-        losses = {}
         (
             observation_batch,
             noise_batch,
@@ -67,7 +81,6 @@ class Trainer:
             weight_batch,
             gradient_scale_batch,
         ) = batch
-        variance_log = [0, 0, 0, 0, 0, 0]
 
         # Keep values as scalars for calculating the priorities for the prioritized replay
         target_value_scalar = numpy.array(target_value, dtype="float32")
@@ -104,13 +117,6 @@ class Trainer:
             observation_batch, noise_batch[:, 0]
         )
         value_scalar.append(models.support_to_scalar(value, self.config.support_size))
-        reward_scalar.append(models.support_to_scalar(reward, self.config.support_size))
-        if value_params is not None and self.training_step % self.config.checkpoint_interval == 0:
-            if self.config.save_histogram_log: self.writer.add_histogram(f"2.Hypermodel/value_params", value_params)
-            self.writer.add_scalar(
-                f"4.Variance/value_params", torch.std(value_params), self.training_step,
-            )
-            variance_log[1] = torch.std(value_params).detach().numpy()
         predictions = [(value, reward, policy_logits)]
         for i in range(1, action_batch.shape[1]):
             value, reward, policy_logits, hidden_state, value_params, state_params, reward_params = self.model.recurrent_inference(
@@ -122,34 +128,8 @@ class Trainer:
             hidden_state.register_hook(lambda grad: grad * 0.5)
             predictions.append((value, reward, policy_logits))
         # predictions: num_unroll_steps+1, 3, batch, 2*support_size+1 | 2*support_size+1 | 9 (according to the 2nd dim)
-        if reward_params is not None and self.training_step % self.config.checkpoint_interval == 0:
-            if self.config.save_histogram_log: self.writer.add_histogram(f"2.Hypermodel/reward_params", reward_params)
-            self.writer.add_scalar(
-                f"4.Variance/reward_params", torch.std(reward_params), self.training_step,
-            )
-            variance_log[2] = torch.std(reward_params).detach().numpy()
-        if state_params is not None and self.training_step % self.config.checkpoint_interval == 0:
-            if self.config.save_histogram_log: self.writer.add_histogram(f"2.Hypermodel/state_params", state_params)
-            self.writer.add_scalar(
-                f"4.Variance/state_params", torch.std(state_params), self.training_step,
-            )
-            variance_log[3] = torch.std(state_params).detach().numpy()
         value_scalar = torch.cat(value_scalar, dim=1)
         reward_scalar = torch.cat(reward_scalar, dim=1)
-        if self.training_step % self.config.checkpoint_interval == 0:
-            self.writer.add_scalar(
-                f"4.Variance/value", torch.std(value_scalar), self.training_step,
-            )
-            self.writer.add_scalar(
-                f"4.Variance/reward", torch.std(reward_scalar), self.training_step,
-            )
-            variance_log[4] = torch.std(value_scalar).detach().numpy()
-            variance_log[5] = torch.std(reward_scalar).detach().numpy()
-        if self.training_step % self.config.checkpoint_interval == 0:
-            variance_log[0] = self.training_step
-            self.variance_logs.loc[self.counter] = variance_log
-            self.variance_logs.to_csv(self.variance_logs_path, sep="\t", index=False)
-            self.counter += 1
 
         ## Compute losses
         value_loss, reward_loss, policy_loss = (0, 0, 0)
@@ -231,18 +211,28 @@ class Trainer:
             loss *= weight_batch
         # Mean over batch dimension (pseudocode do a sum)
         loss = loss.mean()
-
         # Optimize
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
-        self.training_step += 1
 
-        losses = {"total_loss": loss.item(), 
-                  "value_loss": value_loss.mean().item(),
-                  "reward_loss": reward_loss.mean().item(),
-                  "policy_loss": policy_loss.mean().item(),}
-        return priorities, losses
+        losses = {
+            "total_loss": loss.item(), 
+            "value_loss": value_loss.mean().item(),
+            "reward_loss": reward_loss.mean().item(),
+            "policy_loss": policy_loss.mean().item(),
+        }
+        hyper_params = {
+            "value_params": value_params,
+            "reward_params": reward_params,
+            "state_params": state_params,
+        }
+        others = {
+            "value": torch.std(value_scalar).detach().numpy(),
+            "reward": torch.std(reward_scalar).detach().numpy(),
+        }
+
+        return priorities, losses, hyper_params, others
 
     def update_lr(self):
         """
@@ -266,9 +256,7 @@ class Trainer:
         # Cross-entropy seems to have a better convergence than MSE
         value_loss = (-target_value * torch.nn.LogSoftmax(dim=1)(value)).sum(1)
         reward_loss = (-target_reward * torch.nn.LogSoftmax(dim=1)(reward)).sum(1)
-        policy_loss = (-target_policy * torch.nn.LogSoftmax(dim=1)(policy_logits)).sum(
-            1
-        )
+        policy_loss = (-target_policy * torch.nn.LogSoftmax(dim=1)(policy_logits)).sum(1)
         return value_loss, reward_loss, policy_loss
 
     def regularization_loss(self, params, p=2):
