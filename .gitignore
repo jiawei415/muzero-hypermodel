@@ -94,3 +94,5 @@ dmypy.json
 
 results/
 tmp*
+figures
+*.png
