@@ -18,7 +18,7 @@ class MuZeroConfig:
         self.hypermodel = [0, 0, 0] 
         self.normalization = [0, 0, 0] 
         self.reg_loss = False
-        self.reg_loss_coef = 1
+        self.reg_loss_coef = 1e-4
         self.normal_noise_std = 1
         self.target_noise_std = 1
         self.prior_model_std = 1
@@ -50,6 +50,7 @@ class MuZeroConfig:
         self.save_histogram_log = False
 
         ### Game
+        self.use_reward_wrapper = True
         self.observation_shape = (1, 1, self.size**2)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
         self.action_space = list(range(2))  # Fixed list of all possible actions. You should only edit the length
         self.players = list(range(1))  # List of players. You should only edit the length
@@ -254,7 +255,7 @@ class DeepSeaEnv(gym.Env):
         return obs
 
     def step(self, action: int):
-        reward = 0.
+        reward = 0. if MuZeroConfig().use_reward_wrapper else -1.
         action_right = action == self._action_mapping[self._row, self._column]
 
         # Reward calculation
@@ -267,7 +268,8 @@ class DeepSeaEnv(gym.Env):
         if action_right:
             if np.random.rand() > 1 / self._size or self._deterministic:
                 self._column = np.clip(self._column + 1, 0, self._size - 1)
-            reward -= self._unscaled_move_cost / self._size
+            if MuZeroConfig().use_reward_wrapper:
+                reward -= self._unscaled_move_cost / self._size
         else:
             # You were on the right path and went wrong
             self._column = np.clip(self._column - 1, 0, self._size - 1)

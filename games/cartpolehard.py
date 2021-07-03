@@ -18,7 +18,7 @@ class MuZeroConfig:
         self.hypermodel = [0, 0, 0] 
         self.normalization = [0, 0, 0] 
         self.reg_loss = False
-        self.reg_loss_coef = 1
+        self.reg_loss_coef = 1e-4 
         self.normal_noise_std = 1
         self.target_noise_std = 1
         self.prior_model_std = 1
@@ -49,6 +49,7 @@ class MuZeroConfig:
         self.save_histogram_log = False
 
         ### Game
+        self.use_reward_wrapper = True
         self.observation_shape = (1, 1, 4)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
         self.action_space = list(range(2))  # Fixed list of all possible actions. You should only edit the length
         self.players = list(range(1))  # List of players. You should only edit the length
@@ -309,13 +310,13 @@ class CartPoleHard(gym.Env):
         done = False # bool(abs(x) > self.x_threshold or abs(theta) > self.theta_threshold_radians)
         if not done:
             if abs(math.cos(theta)) > 0.95 and abs(x) < 0.1 and abs(theta_dot) < 1 and abs(x_dot) < 1:
-                reward = 1.0
-            else:
                 reward = 0.0
+            else:
+                reward = -1.0
         elif self.steps_beyond_done is None:
             # Pole just fell!
             self.steps_beyond_done = 0
-            reward = 0.0
+            reward = -1.0
         else:
             if self.steps_beyond_done == 0:
                 logger.warn(
@@ -325,9 +326,13 @@ class CartPoleHard(gym.Env):
                     "True' -- any further steps are undefined behavior."
                 )
             self.steps_beyond_done += 1
-            reward = 0.0
-
+            reward = -1.0
+        if MuZeroConfig().use_reward_wrapper:
+            reward = self._reward_wrapper(reward)
         return np.array(self.state), reward, done, {}
+    
+    def _reward_wrapper(self, reward):
+        return 0 if reward == -1 else 1
 
     def reset(self):
         '''

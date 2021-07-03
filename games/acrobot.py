@@ -18,7 +18,7 @@ class MuZeroConfig:
         self.hypermodel = [0, 0, 0] 
         self.normalization = [0, 0, 0] 
         self.reg_loss = False
-        self.reg_loss_coef = 1
+        self.reg_loss_coef = 1e-4 
         self.normal_noise_std = 1
         self.target_noise_std = 1
         self.prior_model_std = 1
