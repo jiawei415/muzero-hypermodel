@@ -46,7 +46,7 @@ class MuZeroConfig:
         # Based Config
         self.seed = 0  # Seed for numpy, torch and the game
         self.max_num_gpus = None  # Fix the maximum number of GPUs to use. It's usually faster to use a single GPU (set it to 1) if it has enough memory. None will use every GPUs available
-        self.episode = 200
+        self.episode = 100
         self.save_histogram_log = False
 
         ### Game
@@ -256,7 +256,7 @@ class DeepSeaEnv(gym.Env):
 
     def step(self, action: int):
         reward = 0. if MuZeroConfig().use_reward_wrapper else -1.
-        action_right = action == self._action_mapping[self._row, self._column]
+        action_right = action == 1 # self._action_mapping[self._row, self._column]
 
         # Reward calculation
         if self._column == self._size - 1 and action_right:
@@ -268,8 +268,8 @@ class DeepSeaEnv(gym.Env):
         if action_right:
             if np.random.rand() > 1 / self._size or self._deterministic:
                 self._column = np.clip(self._column + 1, 0, self._size - 1)
-            if MuZeroConfig().use_reward_wrapper:
-                reward -= self._unscaled_move_cost / self._size
+            # if MuZeroConfig().use_reward_wrapper:
+            #     reward -= self._unscaled_move_cost / self._size
         else:
             # You were on the right path and went wrong
             self._column = np.clip(self._column - 1, 0, self._size - 1)
