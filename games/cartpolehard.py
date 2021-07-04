@@ -45,7 +45,7 @@ class MuZeroConfig:
         # Based Config
         self.seed = 0  # Seed for numpy, torch and the game
         self.max_num_gpus = None  # Fix the maximum number of GPUs to use. It's usually faster to use a single GPU (set it to 1) if it has enough memory. None will use every GPUs available
-        self.episode = 200
+        self.episode = 100
         self.save_histogram_log = False
 
         ### Game
@@ -253,10 +253,6 @@ class CartPoleHard(gym.Env):
         self.state = None
         self.steps_beyond_done = None
 
-        ###############################################
-        '''Hard'''
-        self.theta_init = 45 * 2 * math.pi / 360
-
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
@@ -341,10 +337,11 @@ class CartPoleHard(gym.Env):
         '''
         ###########################################################
         ''' Hard: '''
-        x = np.random.uniform(-1, 1)
-        x_dot = np.random.uniform(-0.5, 0.5)
+        self.theta_init = 45 * 2 * math.pi / 360
+        x = np.random.uniform(-0.05, 0.05)
+        x_dot = np.random.uniform(-0.05, 0.05)
         theta = np.random.uniform(-self.theta_init, self.theta_init)
-        theta_dot = np.random.uniform(-0.5, 0.5)
+        theta_dot = np.random.uniform(-0.05, 0.05)
         self.state = np.array([x, x_dot, theta, theta_dot])
         ''' Hard: '''
 
