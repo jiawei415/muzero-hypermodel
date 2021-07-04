@@ -150,7 +150,7 @@ class MuZero:
             
             num_played_games += 1           
             self.self_play_worker.close_game()
-            self.replay_buffer_worker.save_game(game_history)            
+            self.replay_buffer_worker.save_game(game_history)        
             self.shared_storage_worker.set_info(
                 {
                     "episode_length": len(game_history.action_history) - 1,
@@ -215,14 +215,14 @@ class MuZero:
             self.writer.add_scalar(
                 "1.Total_reward/3.Episode_length", info["episode_length"], counter,
             )
-            self.writer.add_scalar(
-                "1.Total_reward/4.MuZero_reward", info["muzero_reward"], counter,
-            )
-            self.writer.add_scalar(
-                "1.Total_reward/5.Opponent_reward",
-                info["opponent_reward"],
-                counter,
-            )
+            # self.writer.add_scalar(
+            #     "1.Total_reward/4.MuZero_reward", info["muzero_reward"], counter,
+            # )
+            # self.writer.add_scalar(
+            #     "1.Total_reward/5.Opponent_reward",
+            #     info["opponent_reward"],
+            #     counter,
+            # )
             self.writer.add_scalar(
                 "2.Workers/1.Self_played_games", info["num_played_games"], counter,
             )
@@ -232,11 +232,9 @@ class MuZero:
             self.writer.add_scalar(
                 "2.Workers/3.Self_played_steps", info["num_played_steps"], counter
             )
-            self.writer.add_scalar(
-                "2.Workers/4.Reanalysed_games",
-                info["num_reanalysed_games"],
-                counter,
-            )
+            # self.writer.add_scalar(
+            #     "2.Workers/4.Reanalysed_games", info["num_reanalysed_games"], counter,
+            # )
             self.writer.add_scalar(
                 "2.Workers/5.Training_steps_per_self_played_step_ratio",
                 info["training_step"] / max(1, info["num_played_steps"]),
@@ -250,7 +248,7 @@ class MuZero:
             self.writer.add_scalar("3.Loss/Reward_loss", info["reward_loss"], counter)
             self.writer.add_scalar("3.Loss/Policy_loss", info["policy_loss"], counter)
             print(
-                f'Counter: {counter}/{self.config.episode}. Last play reward: {info["total_reward"]:.2f}. Training step: {info["training_step"]}. Played step: {info["num_played_steps"]}. Played games: {info["num_played_games"]}',
+                f'Counter: {counter}/{self.config.episode}. Last play reward: {info["total_reward"]}. Training step: {info["training_step"]}. Played step: {info["num_played_steps"]}.',
                 # end="\r",
             )
         except KeyboardInterrupt:
