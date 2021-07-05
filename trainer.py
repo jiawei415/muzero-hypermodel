@@ -32,8 +32,7 @@ class Trainer:
             self.target_model.load_state_dict(self.model.state_dict())
         self.model.train()
         self.update_lr()
-        priorities, losses, hyper_params, others = self.update_weights(batch)
-        infos = {"training_step": self.training_step, "rl": self.optimizer.param_groups[0]["lr"]}
+        priorities, losses, hyper_params, others = self.update_weights(batch)  
         
         if self.training_step % self.config.checkpoint_interval == 0:
             for i, (name, param) in enumerate(self.model.named_parameters()):
@@ -65,6 +64,7 @@ class Trainer:
             self.variance_logs.to_csv(self.variance_logs_path, sep="\t", index=False)
             self.counter += 1          
         self.training_step += 1        
+        infos = {"training_step": self.training_step, "rl": self.optimizer.param_groups[0]["lr"]}
         return priorities, losses, infos
 
     def update_weights(self, batch):
