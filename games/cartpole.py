@@ -20,7 +20,7 @@ class MuZeroConfig:
         self.reg_loss = True
         self.reg_loss_coef = 1
         self.normal_noise_std = 1
-        self.target_noise_std = 1
+        self.target_noise_std = 0.1
         self.prior_model_std = 1
         self.hyper_inp_dim = 32
         self.num_simulations = 50  
@@ -82,7 +82,7 @@ class MuZeroConfig:
         self.save_model = True  # Save the checkpoint in results_path as model.checkpoint
         self.training_steps = 10000  # Total number of training steps (ie weights update according to a batch)
         self.batch_size = 128  # Number of parts of games to train on at each training step
-        self.checkpoint_interval = 3  # Number of training steps before using the model for self-playing
+        self.checkpoint_interval = 100  # Number of training steps before using the model for self-playing
         self.value_loss_weight = 1  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
         self.train_on_gpu = torch.cuda.is_available()  # Train on GPU if available
         self.optimizer = "Adam"  # "Adam" or "SGD". Paper uses SGD
