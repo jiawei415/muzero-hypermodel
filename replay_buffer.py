@@ -7,7 +7,7 @@ import random
 import importlib
 import multiprocessing
 from tqdm import tqdm
-from self_play import MCTS, GameHistory
+from utils import MCTS, GameHistory
 
 class ReplayBuffer:
     """
