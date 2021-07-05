@@ -117,12 +117,13 @@ class MuZero:
                 )
                 num_played_steps += 1
                 if num_played_games >= self.config.start_train and num_played_steps % self.config.train_frequency == 0:
+                    self.test()
                     train_times = self.config.train_per_paly(num_played_steps)
                     # for _ in tqdm(range(train_times)):
                     for _ in range(train_times):
                         training_step = self.shared_storage_worker.get_info("training_step")
-                        if training_step % self.config.checkpoint_interval == 0:
-                            self.test()
+                        # if training_step % self.config.checkpoint_interval == 0:
+                        #     self.test()
                         index_batch, batch = self.replay_buffer_worker.get_batch()
                         priorities, losses, infos = self.training_worker.train_game(batch)
                         if self.config.PER:

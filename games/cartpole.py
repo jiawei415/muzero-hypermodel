@@ -56,6 +56,7 @@ class MuZeroConfig:
         # Evaluate
         self.muzero_player = 0  # Turn Muzero begins to play (0: MuZero plays first, 1: MuZero plays second)
         self.opponent = None  # Hard coded agent that MuZero faces to assess his progress in multiplayer games. It doesn't influence training. None, "random" or "expert" if implemented in the Game class
+        self.test_times = 5
 
         ### Self-Play
         self.num_workers = 1  # Number of simultaneous threads/workers self-playing to feed the replay buffer
@@ -81,7 +82,7 @@ class MuZeroConfig:
         self.save_model = True  # Save the checkpoint in results_path as model.checkpoint
         self.training_steps = 10000  # Total number of training steps (ie weights update according to a batch)
         self.batch_size = 128  # Number of parts of games to train on at each training step
-        self.checkpoint_interval = 10  # Number of training steps before using the model for self-playing
+        self.checkpoint_interval = 3  # Number of training steps before using the model for self-playing
         self.value_loss_weight = 1  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
         self.train_on_gpu = torch.cuda.is_available()  # Train on GPU if available
         self.optimizer = "Adam"  # "Adam" or "SGD". Paper uses SGD
