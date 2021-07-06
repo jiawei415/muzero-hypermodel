@@ -116,10 +116,14 @@ class TestPlay:
         self.game = Game(self.config.seed)
         self.model = model
         self.noise_dim = int(self.config.hyper_inp_dim)
+        self.fix_noise = torch.normal(0, 1, [1, self.noise_dim]) * self.config.normal_noise_std  
         
-    def start_game(self, render=False):
+    def start_game(self, fix_noise=False, render=False):
         observation = self.game.reset()
-        noise_z = numpy.random.normal(0, 1, [1, self.noise_dim]) * self.config.normal_noise_std
+        if fix_noise:
+            noise_z = self.fix_noise
+        else:
+            noise_z = numpy.random.normal(0, 1, [1, self.noise_dim]) * self.config.normal_noise_std
         if render:
             self.game.render()
         game_history = GameHistory()
