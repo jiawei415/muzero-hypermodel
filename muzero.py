@@ -13,6 +13,7 @@ from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 import models
 import trainer
+import debug
 import self_play
 import replay_buffer
 import shared_storage
@@ -30,20 +31,15 @@ class MuZero:
         self.checkpoint = {
             "weights": None,
             "optimizer_state": None,
-            "total_reward": 0,
-            "muzero_reward": 0,
-            "opponent_reward": 0,
-            "episode_length": 0,
-            "mean_value": 0,
+            "train_total_reward": 0,
+            "train_episode_length": 0,
+            "train_mean_value": 0,
+            "test_total_reward": 0,
+            "test_episode_length": 0,
+            "test_mean_value": 0,
+            "played_games": 0,
+            "played_steps": 0,
             "training_step": 0,
-            "lr": 0,
-            "total_loss": 0,
-            "value_loss": 0,
-            "reward_loss": 0,
-            "policy_loss": 0,
-            "num_played_games": 0,
-            "num_played_steps": 0,
-            "num_reanalysed_games": 0,
             "terminate": False,
         }
         # self.replay_buffer = {}
@@ -52,12 +48,13 @@ class MuZero:
         self.checkpoint["weights"] = copy.deepcopy(weights)
         self.summary = copy.deepcopy(summary)
         # Workers
-        self.self_play_workers = None
+        self.self_play_worker = None
         self.training_worker = None
         self.reanalyse_worker = None
         self.replay_buffer_worker = None
         self.shared_storage_worker = None
         self.test_worker = None
+        self.debug_worker = None
 
     def init_workers(self, log_in_tensorboard=True):
         if log_in_tensorboard or self.config.save_model:
@@ -74,21 +71,19 @@ class MuZero:
             self.writer.add_text("Hyperparameters", "| Parameter | Value |\n|-------|-------|\n" + "\n".join(hp_table),)
             self.writer.add_text("Model summary", self.summary,)
             self.keys = [
-                "total_reward",
-                "episode_length",
-                "mean_value",
+                "train_total_reward",
+                "train_mean_value",
+                "train_episode_length",
+                "test_total_reward",
+                "test_mean_value",
+                "test_episode_length",
+                "played_games",
+                "played_steps",
                 "training_step",
-                "lr",
-                "total_loss",
-                "value_loss",
-                "reward_loss",
-                "policy_loss",
-                "num_played_games",
-                "num_played_steps",
             ]
-            self.training_logs_path = self.config.results_path + "/training_logs.csv"
-            self.training_logs = pd.DataFrame(columns=self.keys)
-            self.training_logs.to_csv(self.training_logs_path, sep="\t", index=False)
+            self.palyer_logs_path = self.config.results_path + "/palyer_logs.csv"
+            self.palyer_logs = pd.DataFrame(columns=self.keys)
+            self.palyer_logs.to_csv(self.palyer_logs_path, sep="\t", index=False)
 
         # Initialize workers
         self.shared_storage_worker = shared_storage.SharedStorage(self.checkpoint, self.config)
@@ -98,13 +93,15 @@ class MuZero:
         self.replay_buffer_worker = replay_buffer.ReplayBuffer(self.reanalyse_worker, self.config)
         self.training_worker = trainer.Trainer(self.model, self.target_model, self.optimizer, self.config, self.writer)
         self.self_play_worker = self_play.SelfPlay(self.model, self.config)
-        self.test_worker = self_play.TestPlay(self.model, self.config, self.writer)
+        self.test_worker = self_play.TestPlay(self.model, self.config)
+        self.debug_worker = debug.Debug(self.model, self.config, self.writer)
 
     def train(self, log_in_tensorboard=True):
         self.init_workers(log_in_tensorboard=log_in_tensorboard)
-        num_played_games = 0
-        num_played_steps = 0
-        for _ in range(self.config.episode):
+        played_games = 0
+        played_steps = 0
+        training_step = 0
+        for episode in range(self.config.episode):
             done = False
             game_history = self.self_play_worker.start_game()
             while not done and len(game_history.action_history) <= self.config.max_moves:
@@ -115,32 +112,14 @@ class MuZero:
                     ),
                     self.config.temperature_threshold,
                 )
-                num_played_steps += 1
-                self.shared_storage_worker.set_info({"num_played_steps": num_played_steps,})
-                if num_played_games >= self.config.start_train and num_played_steps % self.config.train_frequency == 0:
-                    self.test()
-                    train_times = self.config.train_per_paly(num_played_steps)
+                played_steps += 1
+                self.shared_storage_worker.set_info({"played_steps": played_steps})
+                if played_games >= self.config.start_train and played_steps % self.config.train_frequency == 0:       
+                    train_times = self.config.train_per_paly(played_steps)
                     # for _ in tqdm(range(train_times)):
                     for _ in range(train_times):
-                        training_step = self.shared_storage_worker.get_info("training_step")
-                        # if training_step % self.config.checkpoint_interval == 0:
-                        #     self.test()
-                        index_batch, batch = self.replay_buffer_worker.get_batch()
-                        priorities, losses, infos = self.training_worker.train_game(batch)
-                        if self.config.PER:
-                            self.replay_buffer_worker.update_priorities(priorities, index_batch)                  
-                        
-                        self.shared_storage_worker.set_info(
-                            {
-                                "training_step": infos["training_step"],
-                                "lr": infos["rl"],
-                                "total_loss": losses["total_loss"],
-                                "value_loss": losses["value_loss"],
-                                "reward_loss": losses["reward_loss"],
-                                "policy_loss": losses["policy_loss"],
-                            }
-                        )
                         if training_step % self.config.checkpoint_interval == 0:
+                            self.debug()
                             self.shared_storage_worker.set_info(
                                 {
                                     "weights": copy.deepcopy(self.model.get_weights()),
@@ -149,104 +128,92 @@ class MuZero:
                                     ),
                                 }
                             )
-                            if self.config.save_model:
-                                self.shared_storage_worker.save_checkpoint()
-            
-            num_played_games += 1           
+                            if self.config.save_model: self.shared_storage_worker.save_checkpoint()
+                        index_batch, batch = self.replay_buffer_worker.get_batch()
+                        priorities = self.training_worker.train_game(batch, training_step)
+                        if self.config.PER:
+                            self.replay_buffer_worker.update_priorities(priorities, index_batch)
+                        training_step += 1
+                        self.shared_storage_worker.set_info({"training_step": training_step})                        
+            played_games += 1
+            self.shared_storage_worker.set_info({"played_games": played_games,})         
             self.self_play_worker.close_game()
-            self.replay_buffer_worker.save_game(game_history)        
-            self.shared_storage_worker.set_info({"num_played_games": num_played_games,})
+            self.replay_buffer_worker.save_game(game_history)
+            self.shared_storage_worker.set_info(
+                {
+                    "train_total_reward": sum(game_history.reward_history),
+                    "train_episode_length": numpy.mean(game_history.root_values),
+                    "train_mean_value": len(game_history.action_history) - 1,
+                }
+            )
+            self.test()
+            self.player_log(episode)
     
         self.terminate_workers()
 
     def test(self, model_path=None):
         if model_path is not None:
             self.model.load_state_dict(model_path)
-        counter = self.shared_storage_worker.get_info("training_step")
         total_reward, mean_value, episode_length = 0, 0, 0
         # for i in tqdm(range(self.config.test_times)):
         for i in range(self.config.test_times):
             done = False
             game_history = self.test_worker.start_game()
             while not done and len(game_history.action_history) <= self.config.max_moves:
-                done = self.test_worker.play_game(
-                    game_history,    
-                    counter,
-                    use_debug=True if i==0 else False,
-                )
+                done = self.test_worker.play_game(game_history, render=False)
             self.test_worker.close_game()
             total_reward += sum(game_history.reward_history)
             mean_value += numpy.mean(game_history.root_values)
-            episode_length += len(game_history.action_history) - 1
-        
+            episode_length += len(game_history.action_history) - 1      
         self.shared_storage_worker.set_info(
             {
-                "episode_length": episode_length/self.config.test_times,
-                "total_reward": total_reward/self.config.test_times,
-                "mean_value": mean_value/self.config.test_times,
+                "test_total_reward": total_reward/self.config.test_times,
+                "test_episode_length": episode_length/self.config.test_times,
+                "test_mean_value": mean_value/self.config.test_times,
             }
         )
-        self.logging_loop(counter)
+        
+    def debug(self):
+        counter = self.shared_storage_worker.get_info("training_step")
+        self.debug_worker.start_debug(counter)
 
-    def logging_loop(self, counter):
-        """
-        Keep track of the training performance.
-        """
-        # Updating the training performance
+    def player_log(self, counter):
         info = self.shared_storage_worker.get_info(self.keys)
-        training_log = []
-        try:
-            training_log = [
-                info["total_reward"],
-                info["episode_length"],
-                info["mean_value"],
-                info["training_step"],
-                info["lr"],
-                info["total_loss"],
-                info["value_loss"],
-                info["reward_loss"],
-                info["policy_loss"],
-                info["num_played_games"],
-                info["num_played_steps"],
-            ]
-            self.training_logs.loc[counter] = training_log
-            self.training_logs.to_csv(self.training_logs_path, sep="\t", index=False)
-            self.writer.add_scalar(
-                "1.Total_reward/1.Total_reward", info["total_reward"], counter,
-            )
-            self.writer.add_scalar(
-                "1.Total_reward/2.Mean_value", info["mean_value"], counter,
-            )
-            self.writer.add_scalar(
-                "1.Total_reward/3.Episode_length", info["episode_length"], counter,
-            )
-            self.writer.add_scalar(
-                "2.Workers/1.Self_played_games", info["num_played_games"], counter,
-            )
-            self.writer.add_scalar(
-                "2.Workers/2.Training_steps", info["training_step"], counter
-            )
-            self.writer.add_scalar(
-                "2.Workers/3.Self_played_steps", info["num_played_steps"], counter
-            )
-            self.writer.add_scalar(
-                "2.Workers/4.Training_steps_per_self_played_step_ratio",
-                info["training_step"] / max(1, info["num_played_steps"]),
-                counter,
-            )
-            self.writer.add_scalar("2.Workers/5.Learning_rate", info["lr"], counter)
-            self.writer.add_scalar("3.Loss/1.Total_loss", info["total_loss"], counter)
-            self.writer.add_scalar("3.Loss/2.Value_loss", info["value_loss"], counter)
-            self.writer.add_scalar("3.Loss/3.Reward_loss", info["reward_loss"], counter)
-            self.writer.add_scalar("3.Loss/4.Policy_loss", info["policy_loss"], counter)
-            print(
-                f'Test reward: {info["total_reward"]}. ' +
-                f'Training step: {info["training_step"]}. '+
-                f'Played game: {info["num_played_games"]}. ' +
-                f'Played step: {info["num_played_steps"]}.',
-            )
-        except KeyboardInterrupt:
-            pass
+        palyer_log = [
+            info["train_total_reward"],
+            info["train_mean_value"],
+            info["train_episode_length"],
+            info["test_total_reward"],
+            info["test_mean_value"],
+            info["test_episode_length"],
+            info["played_games"],
+            info["played_steps"],
+            info["training_step"],
+        ]
+        self.palyer_logs.loc[counter] = palyer_log
+        self.palyer_logs.to_csv(self.palyer_logs_path, sep="\t", index=False)
+
+        self.writer.add_scalar("1.TrainPlayer/1.Total_reward", info["train_total_reward"], counter)
+        self.writer.add_scalar("1.TrainPlayer/2.Mean_value", info["train_mean_value"], counter)
+        self.writer.add_scalar("1.TrainPlayer/3.Episode_length", info["train_episode_length"], counter)
+
+        self.writer.add_scalar("2.TestPlayer/1.Total_reward", info["test_total_reward"], counter)
+        self.writer.add_scalar("2.TestPlayer/2.Mean_value", info["test_mean_value"], counter)
+        self.writer.add_scalar("2.TestPlayer/3.Episode_length", info["test_episode_length"], counter)
+
+        self.writer.add_scalar("3.Workers/1.Played_games", info["played_games"], counter)
+        self.writer.add_scalar("3.Workers/2.Played_steps", info["played_steps"], counter)
+        self.writer.add_scalar("3.Workers/3.Training_steps", info["training_step"], counter)
+        self.writer.add_scalar("3.Workers/4.Training_steps_per_played_step_ratio",
+            info["training_step"] / max(1, info["played_steps"]),
+            counter,
+        )
+        print(
+            f'Test reward: {info["test_total_reward"]}. ' +
+            f'Training step: {info["training_step"]}. '+
+            f'Played game: {info["played_games"]}. ' +
+            f'Played step: {info["played_steps"]}.',
+        )
 
     def terminate_workers(self):
         """
@@ -255,14 +222,13 @@ class MuZero:
         if self.config.save_model:
             # Persist replay buffer to disk
             print("\n\nPersisting replay buffer games to disk...")
-            saved_keys = ['num_played_games', 'num_played_steps', 'num_reanalysed_games']
+            saved_keys = ['played_games', 'played_steps']
             saved_info = self.shared_storage_worker.get_info(saved_keys)
             pickle.dump(
                 {
                     "buffer": self.replay_buffer_worker.buffer,
-                    "num_played_games": saved_info["num_played_games"],
-                    "num_played_steps": saved_info["num_played_steps"],
-                    "num_reanalysed_games": saved_info["num_reanalysed_games"],
+                    "played_games": saved_info["played_games"],
+                    "played_steps": saved_info["played_steps"],
                 },
                 open(os.path.join(self.config.results_path, "replay_buffer.pkl"), "wb"),
             )
@@ -275,12 +241,13 @@ class MuZero:
 
         print("\nShutting down workers...")
 
-        self.self_play_workers = None
-        self.test_worker = None
+        self.self_play_worker = None
         self.training_worker = None
         self.reanalyse_worker = None
         self.replay_buffer_worker = None
         self.shared_storage_worker = None
+        self.test_worker = None
+        self.debug_worker = None
 
 
 class CPUActor:

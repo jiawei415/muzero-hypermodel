@@ -1,16 +1,9 @@
-import math
-import time
 import numpy
 import torch
-import models
 import importlib
-import pandas as pd
 from utils import MCTS, GameHistory
 
 class SelfPlay:
-    """
-    Class which run in a dedicated thread to play games and save them to the replay-buffer.
-    """
     def __init__(self, model, config):
         self.config = config
         game_module = importlib.import_module("games." + self.config.game_filename)
@@ -23,7 +16,7 @@ class SelfPlay:
         self.model = model
         self.noise_dim = int(self.config.hyper_inp_dim)
              
-    def start_game(self, render=False):
+    def start_game(self):
         observation = self.game.reset()
         assert (
             len(numpy.array(observation).shape) == 3
@@ -32,8 +25,7 @@ class SelfPlay:
             numpy.array(observation).shape == self.config.observation_shape
         ), f"Observation should match the observation_shape defined in MuZeroConfig. Expected {self.config.observation_shape} but got {numpy.array(observation).shape}."
         noise_z = numpy.random.normal(0, 1, [1, self.noise_dim]) * self.config.normal_noise_std
-        if render:
-            self.game.render()
+
         game_history = GameHistory()
         game_history.noise_history = noise_z
         game_history.action_history.append(0)
@@ -45,7 +37,7 @@ class SelfPlay:
 
         return game_history
 
-    def play_game(self, game_history, temperature, temperature_threshold, render=False):    
+    def play_game(self, game_history, temperature, temperature_threshold):    
         self.model.eval()
         with torch.no_grad():
             stacked_observations = game_history.get_stacked_observations(
@@ -69,14 +61,8 @@ class SelfPlay:
                 or len(game_history.action_history) < temperature_threshold
                 else 0,
             )
-
-            if render:
-                print(f'Tree depth: {mcts_info["max_tree_depth"]}')
-                print(f"Root value for player {self.game.to_play()}: {root.value():.2f}")
-                print(f"Played action: {self.game.action_to_string(action)}")
-                self.game.render()
-
             observation, reward, done = self.game.step(action)
+
             game_history.store_search_statistics(root, self.config.action_space)
             # Next batch
             game_history.action_history.append(action)
@@ -85,6 +71,7 @@ class SelfPlay:
             game_history.to_play_history.append(self.game.to_play())
             if any(self.config.use_loss_noise):
                 game_history.unit_sphere_history.append(self.sample_unit_sphere())
+
             return done
 
     def close_game(self):
@@ -122,36 +109,16 @@ class SelfPlay:
 
 
 class TestPlay:
-    """
-    Class which run in a dedicated thread to play games and save them to the replay-buffer.
-    """
-    def __init__(self, model, config, writer):
+    def __init__(self, model, config):
         self.config = config
         game_module = importlib.import_module("games." + self.config.game_filename)
         Game = game_module.Game
         self.game = Game(self.config.seed)
-
-        # Fix random generator seed
-        numpy.random.seed(self.config.seed)
-        torch.manual_seed(self.config.seed)
         self.model = model
         self.noise_dim = int(self.config.hyper_inp_dim)
-        self.writer = writer 
-        columns = []
-        for i in self.game.legal_actions():
-            columns.extend([f"mcts_action_{i}", f"model_action_{i}"])
-        self.action_logs_path = self.config.results_path + "/action_logs.csv"
-        self.action_logs = pd.DataFrame(columns=columns)
-        self.action_logs.to_csv(self.action_logs_path, sep="\t", index=False)
         
     def start_game(self, render=False):
         observation = self.game.reset()
-        assert (
-            len(numpy.array(observation).shape) == 3
-        ), f"Observation should be 3 dimensionnal instead of {len(numpy.array(observation).shape)} dimensionnal. Got observation of shape: {numpy.array(observation).shape}"
-        assert (
-            numpy.array(observation).shape == self.config.observation_shape
-        ), f"Observation should match the observation_shape defined in MuZeroConfig. Expected {self.config.observation_shape} but got {numpy.array(observation).shape}."
         noise_z = numpy.random.normal(0, 1, [1, self.noise_dim]) * self.config.normal_noise_std
         if render:
             self.game.render()
@@ -164,7 +131,7 @@ class TestPlay:
 
         return game_history
 
-    def play_game(self, game_history, counter=0, use_debug=False, render=False):    
+    def play_game(self, game_history, render=False):    
         self.model.eval()
         with torch.no_grad():
             stacked_observations = game_history.get_stacked_observations(
@@ -186,31 +153,7 @@ class TestPlay:
                 print(f'Tree depth: {mcts_info["max_tree_depth"]}')
                 print(f"Root value for player {self.game.to_play()}: {root.value():.2f}")
                 print(f"Played action: {self.game.action_to_string(action)}")
-                self.game.render()
-            # Debug for action pi of initial state
-            if len(game_history.observation_history) == 1 and use_debug:
-                action_log = []
-                debug_obs = (
-                    torch.tensor(stacked_observations)
-                    .float()
-                    .unsqueeze(0)
-                    .to(next(self.model.parameters()).device)
-                )
-                _, _, debug_logits, _, _ = self.model.initial_inference(
-                        debug_obs, torch.tensor(game_history.noise_history, dtype=torch.float)
-                    )
-                debug_policy = torch.softmax(debug_logits, dim=1).squeeze()
-                for i, a in enumerate(self.config.action_space):
-                    self.writer.add_scalar(
-                        f"5.Debug/mcts_action{i}", root.children[i].prior, counter
-                    )
-                    self.writer.add_scalar(
-                        f"5.Debug/model_action{i}", debug_policy[i], counter
-                    )
-                    action_log.extend([root.children[i].prior, debug_policy[i].numpy()])
-                self.action_logs.loc[counter] = action_log
-                self.action_logs.to_csv(self.action_logs_path, sep="\t", index=False) 
-                  
+                self.game.render()            
             observation, reward, done = self.game.step(action)
             game_history.store_search_statistics(root, self.config.action_space)
             # Next batch

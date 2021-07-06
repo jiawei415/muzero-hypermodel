@@ -19,53 +19,61 @@ class Trainer:
         self.target_model = target_model
         self.optimizer = optimizer
         self.writer = writer
-        self.training_step = 0
-        self.debug_noise = torch.normal(0, 1, [1, int(self.config.hyper_inp_dim)]) * self.config.normal_noise_std
-        self.variance_logs_path = self.config.results_path + "/variance_logs.csv"
-        self.variance_logs = pd.DataFrame(columns=["training_step", "value_params", "reward_params", "state_params", "value_scalar", "reward_scalar"])
-        self.variance_logs.to_csv(self.variance_logs_path, sep="\t", index=False)
-        self.counter = 0
+        
+        keys = [
+            "training_step", 
+            "total_loss",
+            "value_loss",
+            "reward_loss",
+            "policy_loss",
+            "lr", 
+            "value_scalar", 
+            "reward_scalar",
+        ]
+        self.trainer_logs_path = self.config.results_path + "/trainer_logs.csv"
+        self.trainer_logs = pd.DataFrame(columns=keys)
+        self.trainer_logs.to_csv(self.trainer_logs_path, sep="\t", index=False)
 
-    def train_game(self, batch):
-        if self.training_step % self.config.target_update_freq == 0:
+    def trainer_log(self, losses, hyper_params, others, counter):
+        lr = self.optimizer.param_groups[0]["lr"]
+        trainer_log = [
+            counter,
+            losses["total_loss"],
+            losses["value_loss"],
+            losses["reward_loss"],
+            losses["policy_loss"],
+            lr,
+            others["value"],
+            others["reward"]
+        ]
+        self.trainer_logs.loc[counter] = trainer_log
+        self.trainer_logs.to_csv(self.trainer_logs_path, sep="\t", index=False)
+
+        self.writer.add_scalar("4.Trainer/1.Total_loss", losses["total_loss"], counter)
+        self.writer.add_scalar("4.Trainer/2.Value_loss", losses["value_loss"], counter)
+        self.writer.add_scalar("4.Trainer/3.Reward_loss", losses["reward_loss"], counter)
+        self.writer.add_scalar("4.Trainer/4.Policy_loss", losses["policy_loss"], counter)
+        self.writer.add_scalar("4.Trainer/5.Learning_rate", lr, counter)
+        for i, (name, param) in enumerate(self.model.named_parameters()):
+            if "bias" not in name and "param" in name:
+                self.writer.add_scalar(f"5.Variance/{name}", torch.std(param), counter)
+        for i, (name, hyper_param) in enumerate(hyper_params.items()):
+            if hyper_param is not None:
+                self.writer.add_scalar(f"5.Variance/{name}", torch.std(hyper_param), counter)
+        for i, (k, v) in enumerate(others.items()): 
+            self.writer.add_scalar(f"5.Variance/{k}", v, counter)
+
+    def train_game(self, batch, training_step):
+        if training_step % self.config.target_update_freq == 0:
             # print(f"update target model")
             self.target_model.load_state_dict(self.model.state_dict())
         self.model.train()
-        self.update_lr()
+        self.update_lr(training_step)
         priorities, losses, hyper_params, others = self.update_weights(batch)  
         
-        if self.training_step % self.config.checkpoint_interval == 0:
-            for i, (name, param) in enumerate(self.model.named_parameters()):
-                if "bias" not in name and "param" in name:
-                    if self.config.save_histogram_log: self.writer.add_histogram(f"1.Model/{name}", param)
-                    self.writer.add_scalar(
-                        f"4.Variance/{name}", torch.std(param), self.training_step,
-                    )
-            for i, (name, hyper_param) in enumerate(hyper_params.items()):
-                if hyper_param is not None:
-                    if self.config.save_histogram_log: self.writer.add_histogram(f"2.Hypermodel/{name}", hyper_param)
-                    self.writer.add_scalar(
-                        f"4.Variance/{name}", torch.std(hyper_param), self.training_step,
-                    )
-            with torch.no_grad():
-                debug_params = self.model.debug(self.debug_noise)
-            variance_log = [self.training_step, 0, 0, 0, 0, 0]
-            for i, (name, param) in enumerate(debug_params.items()):
-                if param is not None:
-                    if self.config.save_histogram_log: self.writer.add_histogram(f"3.Debug/{name}", param)
-                    self.writer.add_scalar(
-                        f"5.Debug/{name}", torch.std(param), self.training_step
-                    )
-                    variance_log[i+1] = torch.std(param).detach().numpy()
-            for i, (k, v) in enumerate(others.items()):
-                self.writer.add_scalar(f"4.Variance/{k}", v, self.training_step,) 
-                variance_log[len(debug_params)+i+1] = v
-            self.variance_logs.loc[self.counter] = variance_log
-            self.variance_logs.to_csv(self.variance_logs_path, sep="\t", index=False)
-            self.counter += 1          
-        self.training_step += 1        
-        infos = {"training_step": self.training_step, "rl": self.optimizer.param_groups[0]["lr"]}
-        return priorities, losses, infos
+        if training_step % self.config.checkpoint_interval == 0:
+            self.trainer_log(losses, hyper_params, others, training_step)
+        return priorities
 
     def update_weights(self, batch):
         """
@@ -234,12 +242,12 @@ class Trainer:
 
         return priorities, losses, hyper_params, others
 
-    def update_lr(self):
+    def update_lr(self, training_step):
         """
         Update learning rate
         """
         lr = self.config.lr_init * self.config.lr_decay_rate ** (
-            self.training_step / self.config.lr_decay_steps
+            training_step / self.config.lr_decay_steps
         )
         for param_group in self.optimizer.param_groups:
             param_group["lr"] = lr
