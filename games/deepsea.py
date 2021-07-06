@@ -135,8 +135,15 @@ class MuZeroConfig:
         else:
             return 600 # 1000 if self.use_reanalyse else 600
 
-    def train_per_paly(self, num_played_steps):
-        return int(num_played_steps * self.train_proportion)
+    def train_per_paly(self, played_steps, mode=1):
+        if mode == 1:
+            train_times = int(num_played_steps * self.train_proportion)
+        elif mode == 2:
+            train_times = int(self.target_update_freq * self.train_proportion)
+        elif mode == 3:
+            train_proportion = self.train_proportion + played_steps / (self.max_moves * self.episode)
+            train_times = int(self.target_update_freq * train_proportion)
+        return train_times
 
 
 class Game(AbstractGame):
