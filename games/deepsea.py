@@ -238,6 +238,7 @@ class DeepSeaEnv(gym.Env):
         self._column = 0
         self._unscaled_move_cost = unscaled_move_cost # config.get("move_cost", 0.01)
         self._action_mapping = np.ones([self._size, self._size])
+        self.use_move_cost = True
 
         assert self._unscaled_move_cost * self._size <= 1, (
             "Please decrease the move cost. Otherwise the optimal decision is not go right."
@@ -269,8 +270,8 @@ class DeepSeaEnv(gym.Env):
         if action_right:
             if np.random.rand() > 1 / self._size or self._deterministic:
                 self._column = np.clip(self._column + 1, 0, self._size - 1)
-            # if MuZeroConfig().use_reward_wrapper:
-            #     reward -= self._unscaled_move_cost / self._size
+            if self.use_move_cost:
+                reward -= self._unscaled_move_cost / self._size
         else:
             # You were on the right path and went wrong
             self._column = np.clip(self._column - 1, 0, self._size - 1)
