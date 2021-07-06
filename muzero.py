@@ -116,6 +116,7 @@ class MuZero:
                     self.config.temperature_threshold,
                 )
                 num_played_steps += 1
+                self.shared_storage_worker.set_info({"num_played_steps": num_played_steps,})
                 if num_played_games >= self.config.start_train and num_played_steps % self.config.train_frequency == 0:
                     self.test()
                     train_times = self.config.train_per_paly(num_played_steps)
@@ -154,12 +155,7 @@ class MuZero:
             num_played_games += 1           
             self.self_play_worker.close_game()
             self.replay_buffer_worker.save_game(game_history)        
-            self.shared_storage_worker.set_info(
-                {
-                    "num_played_games": num_played_games,
-                    "num_played_steps": num_played_steps,
-                }
-            )
+            self.shared_storage_worker.set_info({"num_played_games": num_played_games,})
     
         self.terminate_workers()
 
