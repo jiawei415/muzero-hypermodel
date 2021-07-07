@@ -136,7 +136,7 @@ class MuZeroConfig:
     
     def train_per_paly(self, played_steps):
         if self.train_mode == 1:
-            train_times = int(num_played_steps * self.train_proportion)
+            train_times = int(played_steps * self.train_proportion)
         elif self.train_mode == 2:
             train_times = int(self.target_update_freq * self.train_proportion)
         elif self.train_mode == 3:
