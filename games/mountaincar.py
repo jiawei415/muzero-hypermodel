@@ -31,6 +31,7 @@ class MuZeroConfig:
         self.train_frequency = 100
         self.train_proportion = 0.1
         self.start_train = 1
+        self.train_mode = 1
 
         # Fully Connected Network
         self.stacked_observations = 0
@@ -134,12 +135,12 @@ class MuZeroConfig:
         else:
             return 600 # 1000 if self.use_reanalyse else 600
 
-    def train_per_paly(self, played_steps, mode=1):
-        if mode == 1:
+    def train_per_paly(self, played_steps):
+        if self.train_mode == 1:
             train_times = int(num_played_steps * self.train_proportion)
-        elif mode == 2:
+        elif self.train_mode == 2:
             train_times = int(self.target_update_freq * self.train_proportion)
-        elif mode == 3:
+        elif self.train_mode == 3:
             train_proportion = self.train_proportion + played_steps / (self.max_moves * self.episode)
             train_times = int(self.target_update_freq * train_proportion)
         return train_times
