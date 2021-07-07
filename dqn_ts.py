@@ -4,6 +4,7 @@ import torch
 import pickle
 import pprint
 import argparse
+import datetime
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 
@@ -16,7 +17,7 @@ from tianshou.data import Collector, VectorReplayBuffer, PrioritizedVectorReplay
 
 
 class Game():
-    def __init__(self, game_name, use_reward_wrapper=False):
+    def __init__(self, game_name, use_reward_wrapper=True):
         self.env = gym.make(game_name)
         self.use_reward_wrapper = use_reward_wrapper
         self.action_space = self.env.action_space
@@ -31,6 +32,7 @@ class Game():
             reward = self.refactor(reward)
 
         return observation, reward, done, info
+    
     def refactor(self, reward):
         reward_ = 0 if reward==-1 else 1
         return reward_
@@ -40,6 +42,7 @@ class Game():
 
     def close(self):
         self.env.close()
+
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -84,10 +87,10 @@ def test_dqn(args=get_args()):
     # train_envs = gym.make(args.task)
     # you can also use tianshou.env.SubprocVectorEnv
     train_envs = DummyVectorEnv(
-        [lambda: Game(args.task, True) for _ in range(args.training_num)])
+        [lambda: Game(args.task) for _ in range(args.training_num)])
     # test_envs = gym.make(args.task)
     test_envs = DummyVectorEnv(
-        [lambda: Game(args.task, True) for _ in range(args.test_num)])
+        [lambda: Game(args.task) for _ in range(args.test_num)])
     # seed
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -116,7 +119,7 @@ def test_dqn(args=get_args()):
     # policy.set_eps(1)
     train_collector.collect(n_step=args.batch_size * args.training_num)
     # log
-    log_path = os.path.join(args.logdir, args.task, 'dqn2')
+    log_path = os.path.join("./results", args.task[:-3] + "_" + os.path.basename(__file__)[:-3] + "_" + datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
     writer = SummaryWriter(log_path)
     logger = BasicLogger(writer)
 
@@ -169,7 +172,7 @@ def test_dqn(args=get_args()):
 
 
 def test_pdqn(args=get_args()):
-    args.prioritized_replay = False
+    args.prioritized_replay = True
     args.gamma = .95
     args.seed = 1
     test_dqn(args)
