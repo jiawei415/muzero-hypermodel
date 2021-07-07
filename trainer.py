@@ -56,7 +56,8 @@ class Trainer:
         self.writer.add_scalar("4.Trainer/5.Learning_rate", lr, counter)
         for i, (name, param) in enumerate(self.model.named_parameters()):
             if "bias" not in name and "param" in name:
-                self.writer.add_scalar(f"5.Variance/{name}", torch.std(param), counter)
+                std = torch.sum(torch.diag(torch.mm(param, param.t())))
+                self.writer.add_scalar(f"5.Variance/{name}", std, counter)
         for i, (name, hyper_param) in enumerate(hyper_params.items()):
             if hyper_param is not None:
                 self.writer.add_scalar(f"5.Variance/{name}", torch.std(hyper_param), counter)
