@@ -328,6 +328,19 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
                 self.target_value_norm.append(torch.norm(torch.nn.init.xavier_normal_(
                     torch.empty(size=param.size()))).detach().numpy())
 
+    def get_hypermodel(self,):
+        hypermodel_std = dict()
+        hypermodel_std["value_params.weight"] = \
+            self.calculation_std(self.value_params.weight) if self.value_hyper else 0
+        hypermodel_std["reward_params.weight"] = \
+            self.calculation_std(self.reward_params.weight) if self.reward_hyper else 0
+        hypermodel_std["state_params.weight"] = \
+            self.calculation_std(self.state_params.weight) if self.state_hyper else 0
+        return hypermodel_std
+
+    def calculation_std(self, params):
+        std = torch.sum(torch.diag(torch.mm(params, params.t())))
+        return std.detach().numpy()
 
 def mlp(
     input_size,

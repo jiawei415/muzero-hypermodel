@@ -21,6 +21,7 @@ class Debug:
             self.actions_log[f"mcts_action_{i}"] = []
             self.actions_log[f"model_action_{i}"] = []
         keys.extend(["value_params", "reward_params", "state_params"])
+        keys.extend(["value_params.weight", "reward_params.weight", "state_params.weight"])
         self.debug_logs_path = self.config.results_path + "/debug_logs.csv"
         self.debug_logs = pd.DataFrame(columns=keys)
         self.debug_logs.to_csv(self.debug_logs_path, sep="\t", index=False)
@@ -59,7 +60,7 @@ class Debug:
                 debug_policy = torch.softmax(debug_logits, dim=1).squeeze()
                 for i in self.config.action_space:
                     self.actions_log[f"mcts_action_{i}"].append(root.children[i].prior)
-                    self.actions_log[f"model_action_{i}"].append(debug_policy[i])
+                    self.actions_log[f"model_action_{i}"].append(debug_policy[i].item())
                 debug_params = self.model.debug(torch.tensor(noise_z, dtype=torch.float))
                 for k, v in debug_params.items():
                     if "value" in k and v is not None:
@@ -72,16 +73,20 @@ class Debug:
             reward_params_std = self.calculation_std(reward_params)
             state_params_std = self.calculation_std(state_params)
             params_std = {"value_params": value_params_std, "reward_params": reward_params_std, "state_params": state_params_std}
-        self.debug_log(self.actions_log, params_std, counter)
+        hypermodel_std = self.model.get_hypermodel()
+        self.debug_log(self.actions_log, params_std, hypermodel_std, counter)
         self.game.close()
 
-    def debug_log(self, actions_log, debug_params, counter):
+    def debug_log(self, actions_log, debug_params, hypermodel_std, counter):
         debug_log = []
         for k, v in actions_log.items():
-            self.writer.add_histogram(f"6.Debug/{k}", numpy.array(v), counter)
+            self.writer.add_histogram(f"5.Debug/{k}", numpy.array(v), counter)
             debug_log.append(v)
         for k, v  in debug_params.items():
-            self.writer.add_scalar(f"6.Debug/{k}", v, counter )
+            self.writer.add_scalar(f"5.Debug/{k}", v, counter )
+            debug_log.append(v)
+        for k, v  in hypermodel_std.items():
+            self.writer.add_scalar(f"5.Debug/{k}", v, counter )
             debug_log.append(v)
         self.debug_logs.loc[counter] = debug_log
         self.debug_logs.to_csv(self.debug_logs_path, sep="\t", index=False)
@@ -95,5 +100,5 @@ class Debug:
         params = params - params_mean
         params_cov = torch.mm(params, params.t()) / (n - 1)
         params_std = torch.sum(torch.diag(params_cov))
-        return params_std
+        return params_std.item()
 

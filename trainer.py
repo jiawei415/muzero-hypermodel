@@ -54,16 +54,9 @@ class Trainer:
         self.writer.add_scalar("4.Trainer/3.Reward_loss", losses["reward_loss"], counter)
         self.writer.add_scalar("4.Trainer/4.Policy_loss", losses["policy_loss"], counter)
         self.writer.add_scalar("4.Trainer/5.Learning_rate", lr, counter)
-        for i, (name, param) in enumerate(self.model.named_parameters()):
-            if "bias" not in name and "param" in name:
-                std = torch.sum(torch.diag(torch.mm(param, param.t())))
-                self.writer.add_scalar(f"5.Variance/{name}", std, counter)
-        for i, (name, hyper_param) in enumerate(hyper_params.items()):
-            if hyper_param is not None:
-                self.writer.add_scalar(f"5.Variance/{name}", torch.std(hyper_param), counter)
         for i, (k, v) in enumerate(others.items()): 
-            self.writer.add_scalar(f"5.Variance/{k}", v, counter)
-
+            self.writer.add_scalar(f"4.Trainer/{k}", v, counter)
+        
     def train_game(self, batch, training_step):
         if training_step % self.config.target_update_freq == 0:
             # print(f"update target model")
