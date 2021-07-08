@@ -349,7 +349,7 @@ class CartPoleHard(gym.Env):
         ###########################################################
         ''' Hard: '''
         theta_init = 45 * 2 * math.pi / 360
-        if MuZeroConfig().fix_init_state():
+        if MuZeroConfig().fix_init_state:
             x, x_dot, theta, theta_dot = 0, 0, theta_init, 0
         else:
             x = np.random.uniform(-0.05, 0.05)
