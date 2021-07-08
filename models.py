@@ -249,9 +249,9 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         return inputs.squeeze(dim=1)
 
     def debug(self, noise_z):
-        value_params = self.value_params(noise_z) if self.value_hyper else None
-        state_params = self.state_params(noise_z) if self.state_hyper else None
-        reward_params = self.reward_params(noise_z) if self.reward_hyper else None
+        value_params = self.value_params(noise_z).t() if self.value_hyper else None
+        state_params = self.state_params(noise_z).t() if self.state_hyper else None
+        reward_params = self.reward_params(noise_z).t() if self.reward_hyper else None
 
         return {"value_params": value_params, "reward_params": reward_params, "state_params": state_params, }
 

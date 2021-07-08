@@ -12,11 +12,14 @@ class Debug:
         self.game = Game(self.config.seed)
         self.model = model
         self.writer = writer
-        self.noise_dim = int(self.config.hyper_inp_dim) 
+        self.noise_dim = int(self.config.hyper_inp_dim)
+        self.actions_log = dict()
         
         keys = []
         for i in self.game.legal_actions():
             keys.extend([f"mcts_action_{i}", f"model_action_{i}"])
+            self.actions_log[f"mcts_action_{i}"] = []
+            self.actions_log[f"model_action_{i}"] = []
         keys.extend(["value_params", "reward_params", "state_params"])
         self.debug_logs_path = self.config.results_path + "/debug_logs.csv"
         self.debug_logs = pd.DataFrame(columns=keys)
@@ -55,8 +58,8 @@ class Debug:
                     )
                 debug_policy = torch.softmax(debug_logits, dim=1).squeeze()
                 for i in self.config.action_space:
-                    self.writer.add_scalar(f"5.Debug/mcts_action{i}", root.children[i].prior, counter)
-                    self.writer.add_scalar(f"5.Debug/model_action{i}", debug_policy[i], counter)
+                    self.actions_log[f"mcts_action_{i}"].append(root.children[i].prior)
+                    self.actions_log[f"model_action_{i}"].append(debug_policy[i])
                 debug_params = self.model.debug(torch.tensor(noise_z, dtype=torch.float))
                 for k, v in debug_params.items():
                     if "value" in k and v is not None:
@@ -68,33 +71,29 @@ class Debug:
             value_params_std = self.calculation_std(value_params)
             reward_params_std = self.calculation_std(reward_params)
             state_params_std = self.calculation_std(state_params)
-            self.writer.add_scalar(f"5.Debug/value_params", value_params_std, counter )
-            self.writer.add_scalar(f"5.Debug/reward_params", reward_params_std, counter )
-            self.writer.add_scalar(f"5.Debug/state_params", state_params_std, counter )
-            # self.debug_log(root, debug_policy, debug_params, counter)
+            params_std = {"value_params": value_params_std, "reward_params": reward_params_std, "state_params": state_params_std}
+        self.debug_log(self.actions_log, params_std, counter)
         self.game.close()
 
-    def debug_log(self, root, debug_policy, debug_params, counter):
+    def debug_log(self, actions_log, debug_params, counter):
         debug_log = []
-        for i in self.config.action_space:
-            self.writer.add_scalar(f"5.Debug/mcts_action{i}", root.children[i].prior, counter)
-            self.writer.add_scalar(f"5.Debug/model_action{i}", debug_policy[i], counter)
-            debug_log.extend([root.children[i].prior, debug_policy[i].numpy()])
-        for name, param in debug_params.items():
-            if param is not None:
-                if self.config.save_histogram_log: self.writer.add_histogram(f"5.Debug/{name}", param)
-                self.writer.add_scalar(f"5.Debug/{name}", torch.std(param), counter )
-                debug_log.append(torch.std(param).detach().numpy())
-            else:
-                debug_log.append(0)
+        for k, v in actions_log.items():
+            self.writer.add_histogram(f"6.Debug/{k}", numpy.array(v), counter)
+            debug_log.append(v)
+        for k, v  in debug_params.items():
+            self.writer.add_scalar(f"6.Debug/{k}", v, counter )
+            debug_log.append(v)
         self.debug_logs.loc[counter] = debug_log
         self.debug_logs.to_csv(self.debug_logs_path, sep="\t", index=False)
 
     def calculation_std(self, params):
-        if len(params) == 0:
+        n = len(params)
+        if n == 0:
             return 0
-        params = torch.cat(params, dim=0).numpy()
-        params_cov = numpy.cov(params)
-        params_std = numpy.sum(numpy.diag(params_cov))
+        params = torch.cat(params, dim=1)
+        params_mean = torch.mean(params, dim=1, keepdim=True)
+        params = params - params_mean
+        params_cov = torch.mm(params, params.t()) / (n - 1)
+        params_std = torch.sum(torch.diag(params_cov))
         return params_std
 
