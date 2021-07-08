@@ -51,6 +51,7 @@ class MuZeroConfig:
 
         ### Game
         self.use_reward_wrapper = True
+        self.fix_init_state = False
         self.observation_shape = (1, 1, 4)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
         self.action_space = list(range(2))  # Fixed list of all possible actions. You should only edit the length
         self.players = list(range(1))  # List of players. You should only edit the length
@@ -347,11 +348,14 @@ class CartPoleHard(gym.Env):
         '''
         ###########################################################
         ''' Hard: '''
-        self.theta_init = 45 * 2 * math.pi / 360
-        x = np.random.uniform(-0.05, 0.05)
-        x_dot = np.random.uniform(-0.05, 0.05)
-        theta = np.random.uniform(-self.theta_init, self.theta_init)
-        theta_dot = np.random.uniform(-0.05, 0.05)
+        theta_init = 45 * 2 * math.pi / 360
+        if MuZeroConfig().fix_init_state():
+            x, x_dot, theta, theta_dot = 0, 0, theta_init, 0
+        else:
+            x = np.random.uniform(-0.05, 0.05)
+            x_dot = np.random.uniform(-0.05, 0.05)
+            theta = np.random.uniform(-theta_init, theta_init)
+            theta_dot = np.random.uniform(-0.05, 0.05)
         self.state = np.array([x, x_dot, theta, theta_dot])
         ''' Hard: '''
 
