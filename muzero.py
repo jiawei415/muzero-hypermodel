@@ -142,8 +142,8 @@ class MuZero:
             self.shared_storage_worker.set_info(
                 {
                     "train_total_reward": sum(game_history.reward_history),
-                    "train_episode_length": numpy.mean(game_history.root_values),
-                    "train_mean_value": len(game_history.action_history) - 1,
+                    "train_mean_value": numpy.mean(game_history.root_values),
+                    "train_episode_length": len(game_history.action_history) - 1,
                 }
             )
             self.test()
@@ -168,8 +168,8 @@ class MuZero:
         self.shared_storage_worker.set_info(
             {
                 "test_total_reward": total_reward/self.config.test_times,
-                "test_episode_length": episode_length/self.config.test_times,
                 "test_mean_value": mean_value/self.config.test_times,
+                "test_episode_length": episode_length/self.config.test_times,
             }
         )
         
