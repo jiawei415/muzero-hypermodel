@@ -43,12 +43,7 @@ class Game(AbstractGame):
         """
 
         observation, reward, done, _ = self.env.step(action)
-        if MuZeroConfig().use_reward_wrapper:
-            reward = self._reward_wrapper(reward)
         return np.array([[observation]]), reward, done
-
-    def _reward_wrapper(self, reward):
-        return 0 if reward == -1 else 1
 
     def legal_actions(self):
         """
@@ -220,7 +215,14 @@ class Acrobot(core.Env):
         self.state = ns
         terminal = self._terminal()
         reward = -1. if not terminal else 0.
+        
+        if MuZeroConfig().use_reward_wrapper:
+            reward = self._reward_wrapper(reward)
+
         return (self._get_ob(), reward, terminal, {})
+
+    def _reward_wrapper(self, reward):
+        return 0 if reward == -1 else 1
 
     def _get_ob(self):
         s = self.state

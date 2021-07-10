@@ -3,7 +3,7 @@ import gym
 import math
 import datetime
 import numpy as np
-from gym import spaces
+from gym import spaces, logger
 from gym.utils import seeding
 from .basicconfig import BasicConfig
 from .abstract_game import AbstractGame

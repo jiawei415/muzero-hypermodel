@@ -44,12 +44,7 @@ class Game(AbstractGame):
         """
 
         observation, reward, done, _ = self.env.step(action)
-        if MuZeroConfig().use_reward_wrapper:
-            reward = self._reward_wrapper(reward)
         return np.array([[observation]]), reward, done
-
-    def _reward_wrapper(self, reward):
-        return 0 if reward == -1 else 1
 
     def legal_actions(self):
         """
@@ -189,8 +184,14 @@ class MountainCar(gym.Env):
         )
         reward = -1.0
 
+        if MuZeroConfig().use_reward_wrapper:
+            reward = self._reward_wrapper(reward)
+
         self.state = (position, velocity)
         return np.array(self.state), reward, done, {}
+
+    def _reward_wrapper(self, reward):
+        return 0 if reward == -1 else 1
 
     def reset(self):
         if MuZeroConfig().fix_init_state:

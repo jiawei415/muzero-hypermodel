@@ -1,9 +1,8 @@
 import os
 import gym
-import math
 import datetime
 import numpy as np
-from gym import spaces, logger
+from gym import spaces
 from gym.utils import seeding
 from .basicconfig import BasicConfig
 from .abstract_game import AbstractGame
@@ -112,8 +111,8 @@ class DeepSeaEnv(gym.Env):
 
         self._size = size
         self._deterministic = deterministic # config.get("deterministic", True)
-        self.observation_space = gym.spaces.Box(low=0, high=1, shape=(self._size, self._size), dtype=np.int32)
-        self.action_space = gym.spaces.Discrete(n=2)
+        self.observation_space = spaces.Box(low=0, high=1, shape=(self._size, self._size), dtype=np.int32)
+        self.action_space = spaces.Discrete(n=2)
 
         self._row = 0
         self._column = 0
@@ -125,6 +124,10 @@ class DeepSeaEnv(gym.Env):
             "Please decrease the move cost. Otherwise the optimal decision is not go right."
         )
 
+    def seed(self, seed=None):
+        self.np_random, seed = seeding.np_random(seed)
+        return [seed]
+    
     def reset(self):
         self._row = 0
         self._column = 0

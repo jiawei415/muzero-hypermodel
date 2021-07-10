@@ -2,10 +2,10 @@ class BasicConfig():
     def __init__(self):
         # Important Config
         # value reward state
-        self.use_loss_noise = [0, 0]
         self.priormodel = [0, 0, 0]
         self.hypermodel = [0, 0, 0] 
-        self.normalization = [0, 0, 0] 
+        self.normalization = [0, 0, 0]
+        self.use_loss_noise = [0, 0]
         self.reg_loss = False
         self.reg_loss_coef = 1e-4 
         self.normal_noise_std = 1
@@ -36,7 +36,6 @@ class BasicConfig():
         self.seed = 0  # Seed for numpy, torch and the game
         self.max_num_gpus = None  # Fix the maximum number of GPUs to use. It's usually faster to use a single GPU (set it to 1) if it has enough memory. None will use every GPUs available
         self.episode = 100
-        self.save_histogram_log = False
         
         # Evaluate
         self.muzero_player = 0  # Turn Muzero begins to play (0: MuZero plays first, 1: MuZero plays second)
@@ -106,12 +105,12 @@ class BasicConfig():
             return 0.25
 
 
-    def train_times(self, num_played_games):
-        if num_played_games <= 10:
+    def train_times(self, played_games):
+        if played_games <= 10:
             return 100 # 200 if self.use_reanalyse else 100
-        elif num_played_games <= 20:
+        elif played_games <= 20:
             return 200 # 400 if self.use_reanalyse else 200
-        elif num_played_games <= 40:
+        elif played_games <= 40:
             return 400 # 800 if self.use_reanalyse else 400
         else:
             return 600 # 1000 if self.use_reanalyse else 600
