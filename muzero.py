@@ -102,7 +102,6 @@ class MuZero:
         played_steps = 0
         training_steps = 0
         for episode in range(self.config.episode):
-            self.test()
             done = False
             game_history = self.self_play_worker.start_game()
             while not done and len(game_history.action_history) <= self.config.max_moves:
@@ -147,6 +146,7 @@ class MuZero:
                     "train_episode_length": len(game_history.action_history) - 1,
                 }
             )
+            self.test()
             self.player_log(episode)
     
         self.terminate_workers()
