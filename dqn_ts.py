@@ -16,17 +16,11 @@ from tianshou.utils.net.common import Net
 from tianshou.trainer import offpolicy_trainer
 from tianshou.data import Collector, VectorReplayBuffer, PrioritizedVectorReplayBuffer
 
-GAME_NAMES={"acrobot": "Acrobot-v1", "mountaincar": "MountainCar-v0"}
-
 class Game():
-    def __init__(self, game_name, use_custom_env=False):
+    def __init__(self, game_name):
         game_module = importlib.import_module("games." + game_name)
         self.config = game_module.MuZeroConfig()
-        self.config.use_custom_env = use_custom_env
-        if use_custom_env:
-            self.env = game_module.Game().env
-        else:
-            self.env = gym.make(GAME_NAMES[game_name])
+        self.env = game_module.Game().env
         self.action_space = self.env.action_space
         self.observation_space = self.env.observation_space
 
