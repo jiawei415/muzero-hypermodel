@@ -195,7 +195,7 @@ class MountainCar(gym.Env):
 
     def reset(self):
         if MuZeroConfig().fix_init_state:
-            self.state = np.array([0.5, 0])
+            self.state = np.array([-0.5, 0])
         else:
             self.state = np.array([self.np_random.uniform(low=-0.6, high=-0.4), 0])
         return np.array(self.state)

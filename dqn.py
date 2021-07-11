@@ -43,10 +43,10 @@ training_logs = pd.DataFrame(
     columns = [
         "Total_reward", 
         "Episode_length", 
-        "Self_played_games",
+        "Played_games",
+        "Played_steps",
         "Training_steps",
-        "Self_played_steps",
-        "Total_weighted_loss",
+        "Total_loss",
         ])
 
 training_logs_path = results_path + "/training_logs.csv"
@@ -90,9 +90,9 @@ class ReplayBuffer():
 class QNetwork(nn.Module):
     def __init__(self, game):
         super(QNetwork, self).__init__()
-        self.fc1 = nn.Linear(np.array(game.env.observation_space.shape).prod(), 120)
+        self.fc1 = nn.Linear(np.array(game.observation_space.shape).prod(), 120)
         self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, game.env.action_space.n)
+        self.fc3 = nn.Linear(84, game.action_space.n)
 
     def forward(self, x, device):
         x = torch.Tensor(x).to(device)
@@ -105,9 +105,9 @@ def linear_schedule(start_e: float, end_e: float, duration: int, t: int):
     slope =  (end_e - start_e) / duration
     return max(slope * t + start_e, end_e)
 
-game = game_module.Game(config.seed)
-game.env.action_space.seed(config.seed)
-game.env.observation_space.seed(config.seed)
+game = game_module.Game(config.seed).env
+game.action_space.seed(config.seed)
+game.observation_space.seed(config.seed)
 rb = ReplayBuffer(args.buffer_size)
 q_network = QNetwork(game).to(device)
 target_network = QNetwork(game).to(device)
@@ -117,23 +117,23 @@ loss_fn = nn.MSELoss()
 
 num_played_steps = 0
 num_played_games = 0
-training_step = 0
+training_steps = 0
 total_loss = 0
 
 for counter in range(config.episode):
-    obs = game.reset().squeeze()
+    obs = game.reset()# .squeeze()
     total_reward = 0
     done = False
     episode_length = 0
     while not done and episode_length < config.max_moves:
         epsilon = 0.1 # linear_schedule(args.start_e, args.end_e, args.exploration_fraction*args.total_timesteps, global_step)
         if random.random() < epsilon:
-            action = game.env.action_space.sample()
+            action = game.action_space.sample()
         else:
             logits = q_network(obs.reshape((1,)+obs.shape), device)
             action = torch.argmax(logits, dim=1).tolist()[0]  
-        next_obs, reward, done = game.step(action)
-        next_obs = next_obs.squeeze()   
+        next_obs, reward, done, info = game.step(action)
+        next_obs = next_obs# .squeeze()   
         rb.put((obs, action, reward, next_obs, done))
         obs = next_obs
         total_reward += reward
@@ -143,36 +143,37 @@ for counter in range(config.episode):
             train_times = config.train_per_paly(num_played_steps)
             # for _ in tqdm(range(train_times)):
             for _ in range(train_times):
-                if training_step % config.target_update_freq == 0:
+                if training_steps % config.target_update_freq == 0:
                     target_network.load_state_dict(q_network.state_dict())
+                if training_steps % config.checkpoint_interval == 0:
+                    writer.add_scalar("4.Trainer/1.Total_loss", total_loss, counter)
+                    writer.add_scalar("4.Trainer/5.Learning_rate", optimizer.param_groups[0]["lr"], counter)
                 s_obs, s_actions, s_rewards, s_next_obses, s_dones = rb.sample(config.batch_size)
                 with torch.no_grad():
                     target_max = torch.max(target_network(s_next_obses, device), dim=1)[0]
                     td_target = torch.Tensor(s_rewards).to(device) + config.discount * target_max * (1 - torch.Tensor(s_dones).to(device))
                 old_val = q_network(s_obs, device).gather(1, torch.LongTensor(s_actions).view(-1,1).to(device)).squeeze()
                 total_loss = loss_fn(td_target, old_val)
-                lr = config.lr_init * config.lr_decay_rate ** (training_step / config.lr_decay_steps)
+                lr = config.lr_init * config.lr_decay_rate ** (training_steps / config.lr_decay_steps)
                 optimizer.param_groups[0]["lr"] = lr
                 optimizer.zero_grad()
                 total_loss.backward()
                 optimizer.step()
-                training_step += 1
+                training_steps += 1
                 total_loss = total_loss.item()
     num_played_games += 1
-    print(f'Counter: {counter}/{config.episode}. Last play reward: {total_reward:.2f}. Training step: {training_step}. Played step: {num_played_steps}. Played games: {num_played_games}',)
+    print(f'Counter: {counter}/{config.episode}. Train reward: {total_reward:.2f}. Training step: {training_steps}. Played step: {num_played_steps}. Played games: {num_played_games}')
     writer.add_scalar("1.Total_reward/1.Total_reward", total_reward, counter,)
     writer.add_scalar("1.Total_reward/3.Episode_length", episode_length, counter,)
-    writer.add_scalar("2.Workers/1.Self_played_games", num_played_games, counter,)
-    writer.add_scalar("2.Workers/2.Training_steps", training_step, counter)
-    writer.add_scalar("2.Workers/3.Self_played_steps", num_played_steps, counter)
-    writer.add_scalar(
-        "2.Workers/5.Training_steps_per_self_played_step_ratio",
-        training_step / max(1, num_played_steps),
+    writer.add_scalar("3.Workers/1.Played_games", num_played_games, counter,)
+    writer.add_scalar("3.Workers/2.Played_steps", num_played_steps, counter)
+    writer.add_scalar("3.Workers/3.Training_steps", num_played_steps, counter)
+    writer.add_scalar("3.Workers/4.Training_steps_per_played_step_ratio",
+        num_played_steps / max(1, num_played_steps),
         counter,
     )
-    writer.add_scalar("2.Workers/6.Learning_rate", optimizer.param_groups[0]["lr"], counter)
-    writer.add_scalar("3.Loss/1.Total_weighted_loss", total_loss, counter)
-    training_log = [total_reward, episode_length, num_played_games, training_step, num_played_steps, total_loss]
+    
+    training_log = [total_reward, episode_length, num_played_games, num_played_steps, training_steps, total_loss]
     training_logs.loc[counter] = training_log
     training_logs.to_csv(training_logs_path, sep="\t", index=False)
 game.close()
