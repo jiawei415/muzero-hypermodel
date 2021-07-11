@@ -22,6 +22,10 @@ class BasicConfig():
         self.start_train = 1
         self.train_mode = 1
 
+        ### Game
+        self.players = list(range(1))  # List of players. You should only edit the length
+        self.use_custom_env = False
+
         # Fully Connected Network
         self.stacked_observations = 0
         self.use_representation = True

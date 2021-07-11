@@ -17,7 +17,6 @@ class MuZeroConfig(BasicConfig):
         self.fix_init_state = False
         self.observation_shape = (1, 1, 2)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
         self.action_space = list(range(3))  # Fixed list of all possible actions. You should only edit the length
-        self.players = list(range(1))  # List of players. You should only edit the length
 
         self.results_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../results", os.path.basename(__file__)[:-3] + "_" + datetime.datetime.now().strftime("%Y%m%d%H%M%S"))  # Path to store the model weights and TensorBoard logs
 
@@ -27,8 +26,10 @@ class Game(AbstractGame):
     """
 
     def __init__(self, seed=None):
-        # self.env = gym.make("MountainCar-v0").unwrapped
-        self.env = MountainCar()
+        if MuZeroConfig().use_custom_env:
+            self.env = MountainCar()
+        else:
+            self.env = gym.make("MountainCar-v0").unwrapped
         if seed is not None:
             self.env.seed(seed)
 
