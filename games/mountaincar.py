@@ -27,7 +27,7 @@ class Game(AbstractGame):
         if MuZeroConfig().use_custom_env:
             self.env = MountainCar()
         else:
-            self.env = gym.make("MountainCar-v0").unwrapped
+            self.env = gym.make("MountainCar-v0")
         if seed is not None:
             self.env.seed(seed)
 

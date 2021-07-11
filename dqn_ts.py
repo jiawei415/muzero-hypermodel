@@ -84,10 +84,8 @@ def get_args():
 
 def test_dqn(args):
     # you can also use tianshou.env.SubprocVectorEnv
-    # train_envs = gym.make(args.task)
     train_envs = DummyVectorEnv(
         [lambda: Game(args.task) for _ in range(args.training_num)])
-    # test_envs = gym.make(args.task)
     test_envs = DummyVectorEnv(
         [lambda: Game(args.task) for _ in range(args.test_num)])
     args.state_shape = train_envs.observation_space[0].shape or train_envs.observation_space[0].n

@@ -23,8 +23,8 @@ class BasicConfig():
         self.train_mode = 1
 
         ### Game
-        self.use_reward_wrapper = True
-        self.use_custom_env = False
+        self.use_reward_wrapper = False
+        self.use_custom_env = True
         self.fix_init_state = False
         self.players = list(range(1))  # List of players. You should only edit the length
 
