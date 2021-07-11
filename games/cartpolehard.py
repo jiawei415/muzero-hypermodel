@@ -14,7 +14,6 @@ class MuZeroConfig(BasicConfig):
         super(MuZeroConfig, self).__init__()
         ### Game
         self.use_reward_wrapper = True
-        self.fix_init_state = False
         self.observation_shape = (1, 1, 4)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
         self.action_space = list(range(2))  # Fixed list of all possible actions. You should only edit the length
         
