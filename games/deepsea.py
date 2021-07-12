@@ -13,11 +13,11 @@ class MuZeroConfig(BasicConfig):
         super(MuZeroConfig, self).__init__()
         ### Game
         self.size = 30
-        self.use_reward_wrapper = True
         self.observation_shape = (1, 1, self.size**2)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
         self.action_space = list(range(2))  # Fixed list of all possible actions. You should only edit the length
-
-        self.results_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../results", os.path.basename(__file__)[:-3] + "_" + datetime.datetime.now().strftime("%Y%m%d%H%M%S"))  # Path to store the model weights and TensorBoard logs
+        
+        self.use_reward_wrapper = True
+        self.train_proportion = 1.5
 
 class Game(AbstractGame):
     """
