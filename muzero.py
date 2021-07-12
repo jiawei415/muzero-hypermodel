@@ -24,6 +24,7 @@ class MuZero:
         game_module = importlib.import_module("games." + game_name)
         self.config = game_module.MuZeroConfig()
         self.config.game_filename = game_name
+        self.config.results_path = "results/" + game_name + "_" + time.strftime("%Y%m%d%H%M%S", time.localtime())
         # Fix random generator seed
         numpy.random.seed(self.config.seed)
         torch.manual_seed(self.config.seed)

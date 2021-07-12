@@ -1,7 +1,5 @@
-import os
 import gym
 import math
-import datetime
 import numpy as np
 from gym import spaces, logger
 from gym.utils import seeding
@@ -17,8 +15,6 @@ class MuZeroConfig(BasicConfig):
         self.observation_shape = (1, 1, 4)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
         self.action_space = list(range(2))  # Fixed list of all possible actions. You should only edit the length
         
-        self.results_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../results", os.path.basename(__file__)[:-3] + "_" + datetime.datetime.now().strftime("%Y%m%d%H%M%S"))  # Path to store the model weights and TensorBoard logs
-
 class Game(AbstractGame):
     """
     Game wrapper.
