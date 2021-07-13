@@ -138,11 +138,11 @@ def test_dqn(args):
 
     def train_fn(epoch, env_step):
         # eps annnealing, just a demo
-        if env_step <= 10000:
+        if env_step <= 100000:
             policy.set_eps(args.eps_train)
-        elif env_step <= 50000:
-            eps = args.eps_train - (env_step - 10000) / \
-                40000 * (0.5 * args.eps_train)
+        elif env_step <= 500000:
+            eps = args.eps_train - (env_step - 100000) / \
+                400000 * (0.5 * args.eps_train)
             policy.set_eps(eps)
         else:
             policy.set_eps(0.5 * args.eps_train)
