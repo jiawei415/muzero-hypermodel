@@ -2,6 +2,7 @@
 
 cmd=$1
 task=$2
+config=$3
 
 # echo "cmd: $cmd, task: $task"
 
@@ -17,9 +18,6 @@ if [ "$cmd" = 'kill' ]; then
 fi
 
 if [ "$cmd" = 'run' ]; then
-    # export http_proxy=
-    # export https_proxy=
-    
     # >>> conda initialize >>>
     # !! Contents within this block are managed by 'conda init' !!
     __conda_setup="$('/root/miniconda3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
@@ -36,7 +34,7 @@ if [ "$cmd" = 'run' ]; then
     # <<< conda initialize <<<
     conda activate torch
     
-    python /home/jiawei/Code/tx-muzero-hypermodel/muzero.py $task > log.out 2> log.err &
+    python /home/jiawei/Code/tx-muzero-hypermodel/muzero.py --game $task --config $config > log.out 2> log.err &
     # nohup python /home/jiawei/Code/tx-muzero-hypermodel/muzero.py $task > log.out 2> log.err &
     # echo "run $task"
 fi
