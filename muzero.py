@@ -1,11 +1,11 @@
 import os
-import sys
 import copy
 import glog
 import time
 import numpy
 import torch
 import pickle
+import argparse
 import warnings
 import importlib
 import pandas as pd
@@ -19,12 +19,13 @@ import replay_buffer
 import shared_storage
 
 class MuZero:
-    def __init__(self, game_name, config=None, split_resources_in=1):
+    def __init__(self, game_name, config=None):
         # Load the game and the config from the module with the game name
         game_module = importlib.import_module("games." + game_name)
         self.config = game_module.MuZeroConfig()
         self.config.game_filename = game_name
         self.config.results_path = "results/" + game_name + "_" + time.strftime("%Y%m%d%H%M%S", time.localtime())
+        self.init_config(config)
         # Fix random generator seed
         numpy.random.seed(self.config.seed)
         torch.manual_seed(self.config.seed)
@@ -56,6 +57,13 @@ class MuZero:
         self.shared_storage_worker = None
         self.test_worker = None
         self.debug_worker = None
+
+    def init_config(self, config):
+        if config is not None:
+            for k, v in config.items():
+                if k not in self.config.__dict__.keys():
+                    print(f'unrecognized config k: {k}, v: {v}, ignored')
+                self.config.__dict__[k] = v
 
     def init_workers(self, log_in_tensorboard=True):
         if log_in_tensorboard or self.config.save_model:
@@ -310,13 +318,21 @@ class CPUActor:
         return optimizer
 
 
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--game', type=str, default="cartpole",
+                        help='game name')
+    parser.add_argument('--config', type=str, default="",
+                        help='game config')
+    args = parser.parse_args()
+    return args
+
 if __name__ == "__main__": 
     warnings.filterwarnings('ignore')
-    try:
-        game = sys.argv[1]
-    except:
-        game = "cartpole"
+    args = get_args()
+    game = args.game
+    config = eval(args.config) if args.config != "" else None
     glog.info(f"this is game: {game}")
-    muzero = MuZero(game)
+    muzero = MuZero(game, config)
     muzero.train()
     
