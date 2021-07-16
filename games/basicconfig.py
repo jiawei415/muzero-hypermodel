@@ -5,7 +5,7 @@ class BasicConfig():
         self.priormodel = [0, 0, 0]
         self.hypermodel = [0, 0, 0] 
         self.normalization = [0, 0, 0]
-        self.use_loss_noise = [0, 0]
+        self.use_loss_noise = [0, 0, 0]
         self.reg_loss = False
         self.reg_loss_coef = 1e-4 
         self.normal_noise_std = 1

@@ -23,7 +23,7 @@ class ReplayBuffer:
             [len(game_history.root_values) for game_history in self.buffer.values()]
         )
         self.reanalyse_worker = reanalyse_worker
-        self.use_value_noise, self.use_reward_noise = config.use_loss_noise
+        self.use_value_noise, self.use_reward_noise, _ = config.use_loss_noise
         # Fix random generator seed
         numpy.random.seed(self.config.seed)
         self.counter = self.config.seed + 1
