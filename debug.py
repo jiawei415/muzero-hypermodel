@@ -37,7 +37,7 @@ class Debug:
                 -1,
                 self.config.stacked_observations,
             )
-            for _i in range(self.config.debug_times):
+            for i in range(self.config.debug_times):
                 noise_z = numpy.random.normal(0, 1, [1, self.noise_dim]) * self.config.normal_noise_std
                 root, mcts_info = MCTS(self.config).run(
                     noise_z,
@@ -81,6 +81,7 @@ class Debug:
         debug_log = []
         for k, v in actions_log.items():
             self.writer.add_histogram(f"5.Debug/{k}", numpy.array(v), counter)
+            self.writer.add_scalar(f"5.Debug/{k}", numpy.mean(numpy.array(v)), counter)
             debug_log.append(v)
         for k, v  in debug_params.items():
             self.writer.add_scalar(f"5.Debug/{k}", v, counter )
@@ -101,4 +102,3 @@ class Debug:
         params_cov = torch.mm(params, params.t()) / (n - 1)
         params_std = torch.sum(torch.diag(params_cov))
         return params_std.item()
-

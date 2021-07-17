@@ -1,13 +1,10 @@
 import copy
-import time
 import numpy
 import torch
-import models
 import random
 import importlib
 import multiprocessing
-from tqdm import tqdm
-from utils import MCTS, GameHistory
+from utils import MCTS
 
 class ReplayBuffer:
     """
@@ -68,7 +65,7 @@ class ReplayBuffer:
             seed, game_id, game_history, game_prob, game_pos, pos_prob = game_data
             if self.config.use_reanalyse:
                 start_index = game_pos
-                end_index = min(game_pos+self.config.num_unroll_steps+self.config.td_steps+1, len(game_history.root_values))
+                end_index = min(game_pos + self.config.num_unroll_steps + self.config.td_steps + 1, len(game_history.root_values))
                 target_game_history = self.reanalyse_worker.reanalyse(game_history, seed, start_index, end_index)
             else:
                 target_game_history = game_history

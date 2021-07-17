@@ -1,8 +1,7 @@
-import copy
 import numpy
 import torch
-import models
 import pandas as pd
+from utils import support_to_scalar, scalar_to_support
 
 class Trainer:
     """
@@ -20,31 +19,19 @@ class Trainer:
         self.optimizer = optimizer
         self.writer = writer
         
-        keys = [
-            "training_step", 
-            "total_loss",
-            "value_loss",
-            "reward_loss",
-            "policy_loss",
-            "lr", 
-            "value_scalar", 
-            "reward_scalar",
-        ]
+        keys = ["total_loss", "value_loss", "reward_loss", "policy_loss", "lr",]
         self.trainer_logs_path = self.config.results_path + "/trainer_logs.csv"
         self.trainer_logs = pd.DataFrame(columns=keys)
         self.trainer_logs.to_csv(self.trainer_logs_path, sep="\t", index=False)
 
-    def trainer_log(self, losses, hyper_params, others, counter):
+    def trainer_log(self, losses, counter):
         lr = self.optimizer.param_groups[0]["lr"]
         trainer_log = [
-            counter,
             losses["total_loss"],
             losses["value_loss"],
             losses["reward_loss"],
             losses["policy_loss"],
             lr,
-            others["value"],
-            others["reward"]
         ]
         self.trainer_logs.loc[counter] = trainer_log
         self.trainer_logs.to_csv(self.trainer_logs_path, sep="\t", index=False)
@@ -54,8 +41,6 @@ class Trainer:
         self.writer.add_scalar("4.Trainer/3.Reward_loss", losses["reward_loss"], counter)
         self.writer.add_scalar("4.Trainer/4.Policy_loss", losses["policy_loss"], counter)
         self.writer.add_scalar("4.Trainer/5.Learning_rate", lr, counter)
-        for i, (k, v) in enumerate(others.items()): 
-            self.writer.add_scalar(f"4.Trainer/{k}", v, counter)
         
     def train_game(self, batch, training_step):
         if training_step % self.config.target_update_freq == 0:
@@ -63,10 +48,10 @@ class Trainer:
             self.target_model.load_state_dict(self.model.state_dict())
         self.model.train()
         self.update_lr(training_step)
-        priorities, losses, hyper_params, others = self.update_weights(batch)  
+        priorities, losses = self.update_weights(batch)  
         
         if training_step % self.config.checkpoint_interval == 0:
-            self.trainer_log(losses, hyper_params, others, training_step)
+            self.trainer_log(losses, training_step)
         return priorities
 
     def update_weights(self, batch):
@@ -105,33 +90,24 @@ class Trainer:
         # target_reward: batch, num_unroll_steps+1
         # target_policy: batch, num_unroll_steps+1, len(action_space)
         # gradient_scale_batch: batch, num_unroll_steps+1
-
-        target_value = models.scalar_to_support(target_value, self.config.support_size)
-        target_reward = models.scalar_to_support(
-            target_reward, self.config.support_size
-        )
+        target_value = scalar_to_support(target_value, self.config.support_size)
+        target_reward = scalar_to_support(target_reward, self.config.support_size)
         # target_value: batch, num_unroll_steps+1, 2*support_size+1
         # target_reward: batch, num_unroll_steps+1, 2*support_size+1
-        value_scalar = []
-        reward_scalar = []
+
         ## Generate predictions
         value, reward, policy_logits, hidden_state, value_params = self.model.initial_inference(
             observation_batch, noise_batch[:, 0]
         )
-        value_scalar.append(models.support_to_scalar(value, self.config.support_size))
         predictions = [(value, reward, policy_logits)]
         for i in range(1, action_batch.shape[1]):
             value, reward, policy_logits, hidden_state, value_params, state_params, reward_params = self.model.recurrent_inference(
                 hidden_state, action_batch[:, i], noise_batch[:, i]
             )
-            value_scalar.append(models.support_to_scalar(value, self.config.support_size))
-            reward_scalar.append(models.support_to_scalar(reward, self.config.support_size))
             # Scale the gradient at the start of the dynamics function (See paper appendix Training)
             hidden_state.register_hook(lambda grad: grad * 0.5)
             predictions.append((value, reward, policy_logits))
         # predictions: num_unroll_steps+1, 3, batch, 2*support_size+1 | 2*support_size+1 | 9 (according to the 2nd dim)
-        value_scalar = torch.cat(value_scalar, dim=1)
-        reward_scalar = torch.cat(reward_scalar, dim=1)
 
         ## Compute losses
         value_loss, reward_loss, policy_loss = (0, 0, 0)
@@ -149,11 +125,7 @@ class Trainer:
         policy_loss += current_policy_loss
         # Compute priorities for the prioritized replay (See paper appendix Training)
         pred_value_scalar = (
-            models.support_to_scalar(value, self.config.support_size)
-            .detach()
-            .cpu()
-            .numpy()
-            .squeeze()
+            support_to_scalar(value, self.config.support_size).detach().cpu().numpy().squeeze()
         )
         priorities[:, 0] = (
             numpy.abs(pred_value_scalar - target_value_scalar[:, 0])
@@ -192,11 +164,7 @@ class Trainer:
 
             # Compute priorities for the prioritized replay (See paper appendix Training)
             pred_value_scalar = (
-                models.support_to_scalar(value, self.config.support_size)
-                .detach()
-                .cpu()
-                .numpy()
-                .squeeze()
+                support_to_scalar(value, self.config.support_size).detach().cpu().numpy().squeeze()
             )
             priorities[:, i] = (
                 numpy.abs(pred_value_scalar - target_value_scalar[:, i])
@@ -224,17 +192,7 @@ class Trainer:
             "reward_loss": reward_loss.mean().item(),
             "policy_loss": policy_loss.mean().item(),
         }
-        hyper_params = {
-            "value_params": value_params,
-            "reward_params": reward_params,
-            "state_params": state_params,
-        }
-        others = {
-            "value": torch.std(value_scalar).detach().numpy(),
-            "reward": torch.std(reward_scalar).detach().numpy(),
-        }
-
-        return priorities, losses, hyper_params, others
+        return priorities, losses
 
     def update_lr(self, training_step):
         """

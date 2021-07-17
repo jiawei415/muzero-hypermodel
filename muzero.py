@@ -116,9 +116,7 @@ class MuZero:
             while not done and len(game_history.action_history) <= self.config.max_moves:
                 done = self.self_play_worker.play_game(
                     game_history,
-                    self.config.visit_softmax_temperature_fn(
-                        trained_steps=self.shared_storage_worker.get_info("training_steps")
-                    ),
+                    self.config.visit_softmax_temperature_fn(training_steps),
                     self.config.temperature_threshold,
                 )
                 played_steps += 1
@@ -145,7 +143,7 @@ class MuZero:
                         training_steps += 1
                         self.shared_storage_worker.set_info({"training_steps": training_steps})                        
             played_games += 1
-            self.shared_storage_worker.set_info({"played_games": played_games,})         
+            self.shared_storage_worker.set_info({"played_games": played_games})         
             self.self_play_worker.close_game()
             self.replay_buffer_worker.save_game(game_history)
             self.shared_storage_worker.set_info(

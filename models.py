@@ -1,23 +1,10 @@
-import math
 import torch
 import numpy
 from abc import ABC, abstractmethod
 
 class MuZeroNetwork:
     def __new__(cls, config):
-        return MuZeroFullyConnectedNetwork(
-            config.observation_shape,
-            config.stacked_observations,
-            len(config.action_space),
-            config.encoding_size,
-            config.fc_reward_layers,
-            config.fc_value_layers,
-            config.fc_policy_layers,
-            config.fc_representation_layers,
-            config.fc_dynamics_layers,
-            config.support_size,
-            config,
-        )
+        return MuZeroFullyConnectedNetwork(config)
 
 
 def dict_to_cpu(dictionary):
@@ -53,23 +40,18 @@ class AbstractNetwork(ABC, torch.nn.Module):
 
 
 class MuZeroFullyConnectedNetwork(AbstractNetwork):
-    def __init__(
-        self,
-        observation_shape,
-        stacked_observations,
-        action_space_size,
-        encoding_size,
-        fc_reward_layers,
-        fc_value_layers,
-        fc_policy_layers,
-        fc_representation_layers,
-        fc_dynamics_layers,
-        support_size,
-        config,
-    ):
+    def __init__(self, config):
         super().__init__()
-        self.action_space_size = action_space_size
-        self.full_support_size = 2 * support_size + 1
+        observation_shape = config.observation_shape
+        stacked_observations = config.stacked_observations
+        encoding_size = config.encoding_size
+        fc_reward_layers = config.fc_reward_layers
+        fc_value_layers = config.fc_value_layers
+        fc_policy_layers = config.fc_policy_layers
+        fc_representation_layers = config.fc_representation_layers
+        fc_dynamics_layers = config.fc_dynamics_layers
+        self.action_space_size = len(config.action_space)
+        self.full_support_size = 2 * config.support_size + 1
         self.value_prior, self.reward_prior, self.state_prior = config.priormodel
         self.value_hyper, self.reward_hyper, self.state_hyper = config.hypermodel
         self.value_normal, self.reward_normal, self.state_normal = config.normalization
@@ -342,6 +324,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         std = torch.sum(torch.diag(torch.mm(params, params.t())))
         return std.detach().numpy()
 
+
 def mlp(
     input_size,
     layer_sizes,
@@ -355,50 +338,3 @@ def mlp(
         act = activation if i < len(sizes) - 2 else output_activation
         layers += [torch.nn.Linear(sizes[i], sizes[i + 1]), act()]
     return torch.nn.Sequential(*layers)
-
-
-def support_to_scalar(logits, support_size):
-    """
-    Transform a categorical representation to a scalar
-    See paper appendix Network Architecture
-    """
-    # Decode to a scalar
-    probabilities = torch.softmax(logits, dim=1)
-    support = (
-        torch.tensor([x for x in range(-support_size, support_size + 1)])
-        .expand(probabilities.shape)
-        .float()
-        .to(device=probabilities.device)
-    )
-    x = torch.sum(support * probabilities, dim=1, keepdim=True)
-
-    # Invert the scaling (defined in https://arxiv.org/abs/1805.11593)
-    x = torch.sign(x) * (
-        ((torch.sqrt(1 + 4 * 0.001 * (torch.abs(x) + 1 + 0.001)) - 1) / (2 * 0.001))
-        ** 2
-        - 1
-    )
-    return x
-
-
-def scalar_to_support(x, support_size):
-    """
-    Transform a scalar to a categorical representation with (2 * support_size + 1) categories
-    See paper appendix Network Architecture
-    """
-    # Reduce the scale (defined in https://arxiv.org/abs/1805.11593)
-    x = torch.sign(x) * (torch.sqrt(torch.abs(x) + 1) - 1) + 0.001 * x
-
-    # Encode on a vector
-    x = torch.clamp(x, -support_size, support_size)
-    floor = x.floor()
-    prob = x - floor
-    logits = torch.zeros(x.shape[0], x.shape[1], 2 * support_size + 1).to(x.device)
-    logits.scatter_(
-        2, (floor + support_size).long().unsqueeze(-1), (1 - prob).unsqueeze(-1)
-    )
-    indexes = floor + support_size + 1
-    prob = prob.masked_fill_(2 * support_size < indexes, 0.0)
-    indexes = indexes.masked_fill_(2 * support_size < indexes, 0.0)
-    logits.scatter_(2, indexes.long().unsqueeze(-1), prob.unsqueeze(-1))
-    return logits
