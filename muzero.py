@@ -24,7 +24,7 @@ class MuZero:
         game_module = importlib.import_module("games." + game_name)
         self.config = game_module.MuZeroConfig()
         self.config.game_filename = game_name
-        self.config.results_path = "results/" + game_name + "_" + time.strftime("%Y%m%d%H%M%S", time.localtime())
+        self.config.results_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "results/" + game_name + "_" + time.strftime("%Y%m%d%H%M%S", time.localtime()))
         self.init_config(config)
         # Fix random generator seed
         numpy.random.seed(self.config.seed)
