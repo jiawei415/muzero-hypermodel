@@ -20,7 +20,7 @@ class ReplayBuffer:
             [len(game_history.root_values) for game_history in self.buffer.values()]
         )
         self.reanalyse_worker = reanalyse_worker
-        self.use_value_noise, self.use_reward_noise, _ = config.use_loss_noise
+        self.use_value_noise, self.use_reward_noise, _ = config.target_noise
         # Fix random generator seed
         numpy.random.seed(self.config.seed)
         self.counter = self.config.seed + 1
@@ -292,7 +292,7 @@ class ReplayBuffer:
             value = self.compute_target_value(game_history, current_index) if current_index < game_history_len else 0
             reward = 0 if current_index > game_history_len else game_history.reward_history[current_index] 
             
-            if any(self.config.use_loss_noise):
+            if self.config.use_target_noise:
                 target_noise = self.compute_target_noise(game_history, current_index)
                 if self.use_value_noise:
                     value += target_noise

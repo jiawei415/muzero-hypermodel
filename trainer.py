@@ -173,7 +173,7 @@ class Trainer:
 
         # Scale the value loss, paper recommends by 0.25 (See paper appendix Reanalyze)
         loss = value_loss * self.config.value_loss_weight + reward_loss + policy_loss
-        if self.config.reg_loss:
+        if self.config.use_reg_loss:
             reg_loss = self.regularization_loss([value_params, reward_params, state_params])
             loss += self.config.reg_loss_coef * reg_loss
         if self.config.PER:

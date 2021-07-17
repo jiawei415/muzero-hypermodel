@@ -2,15 +2,21 @@ class BasicConfig():
     def __init__(self):
         # Important Config
         # value reward state
+        self.hypermodel = [0, 0, 0]
         self.priormodel = [0, 0, 0]
-        self.hypermodel = [0, 0, 0] 
         self.normalization = [0, 0, 0]
-        self.use_loss_noise = [0, 0, 0]
-        self.reg_loss = False
-        self.reg_loss_coef = 1e-4 
+        self.target_noise = [0, 0, 0]
+
+        self.use_priormodel = False
+        self.use_normalization = False
+        self.use_target_noise = False
+        self.use_reg_loss = False
+        
+        # Based Config
+        self.reg_loss_coef = 1e-4
+        self.prior_model_std = 1
         self.normal_noise_std = 1
         self.target_noise_std = 0.1
-        self.prior_model_std = 1
         self.hyper_inp_dim = 32
         self.num_simulations = 50  
         self.reanalyse_num_simulations = 10
@@ -21,10 +27,12 @@ class BasicConfig():
         self.train_proportion = 0.1
         self.start_train = 1
         self.train_mode = 1
+        self.total_episode = 100
+        self.seed = 0
 
         ### Game
         self.use_reward_wrapper = False
-        self.use_custom_env = False
+        self.use_custom_env = True
         self.fix_init_state = False
         self.players = list(range(1))  # List of players. You should only edit the length
 
@@ -37,21 +45,12 @@ class BasicConfig():
         self.fc_reward_layers = [16]  # Define the hidden layers in the reward network
         self.fc_value_layers = [16]  # Define the hidden layers in the value network
         self.fc_policy_layers = [16]  # Define the hidden layers in the policy network
-
-        # Based Config
-        self.seed = 0  # Seed for numpy, torch and the game
-        self.max_num_gpus = None  # Fix the maximum number of GPUs to use. It's usually faster to use a single GPU (set it to 1) if it has enough memory. None will use every GPUs available
-        self.episode = 100
         
         # Evaluate
-        self.muzero_player = 0  # Turn Muzero begins to play (0: MuZero plays first, 1: MuZero plays second)
-        self.opponent = None  # Hard coded agent that MuZero faces to assess his progress in multiplayer games. It doesn't influence training. None, "random" or "expert" if implemented in the Game class
         self.test_times = 5
         self.debug_times = 10
 
         ### Self-Play
-        self.num_workers = 1  # Number of simultaneous threads/workers self-playing to feed the replay buffer
-        self.selfplay_on_gpu = False
         self.max_moves = 500  # Maximum number of moves if game is not finished before
         self.discount = 0.997  # Chronological discount of the reward
         self.temperature_threshold = None  # Number of moves before dropping the temperature given by visit_softmax_temperature_fn to 0 (ie selecting the best action). If None, visit_softmax_temperature_fn is used every time
@@ -91,9 +90,8 @@ class BasicConfig():
         # Reanalyze (See paper appendix Reanalyse)
         self.use_reanalyse = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
         self.all_reanalyse = False
-        self.reanalyse_on_gpu = False
-        self.num_process = 32
         self.use_multiprocess = True
+        self.num_process = 32
 
     def visit_softmax_temperature_fn(self, trained_steps):
         """

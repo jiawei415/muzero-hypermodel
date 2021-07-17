@@ -32,7 +32,7 @@ class SelfPlay:
         game_history.observation_history.append(observation)
         game_history.reward_history.append(0)
         game_history.to_play_history.append(self.game.to_play())
-        if any(self.config.use_loss_noise):
+        if self.config.use_target_noise:
             game_history.unit_sphere_history.append(self.sample_unit_sphere())
 
         return game_history
@@ -69,7 +69,7 @@ class SelfPlay:
             game_history.observation_history.append(observation)
             game_history.reward_history.append(reward)
             game_history.to_play_history.append(self.game.to_play())
-            if any(self.config.use_loss_noise):
+            if self.config.use_target_noise:
                 game_history.unit_sphere_history.append(self.sample_unit_sphere())
 
             return done

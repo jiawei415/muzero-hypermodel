@@ -64,6 +64,9 @@ class MuZero:
                 if k not in self.config.__dict__.keys():
                     print(f'unrecognized config k: {k}, v: {v}, ignored')
                 self.config.__dict__[k] = v
+            if self.config.use_priormodel: self.config.priormodel = self.config.hypermodel
+            if self.config.use_normalization: self.config.normalization = self.config.hypermodel
+            if self.config.use_target_noise: self.config.target_noise = self.config.hypermodel
 
     def init_workers(self, log_in_tensorboard=True):
         if log_in_tensorboard or self.config.save_model:
@@ -110,7 +113,7 @@ class MuZero:
         played_games = 0
         played_steps = 0
         training_steps = 0
-        for episode in range(self.config.episode):
+        for episode in range(self.config.total_episode):
             done = False
             game_history = self.self_play_worker.start_game()
             while not done and len(game_history.action_history) <= self.config.max_moves:
