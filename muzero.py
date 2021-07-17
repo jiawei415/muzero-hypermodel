@@ -322,7 +322,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--game', type=str, default="cartpole",
                         help='game name')
-    parser.add_argument('--config', type=str, default="",
+    parser.add_argument('--config', type=str, default="none",
                         help='game config')
     args = parser.parse_args()
     return args
@@ -331,7 +331,7 @@ if __name__ == "__main__":
     warnings.filterwarnings('ignore')
     args = get_args()
     game = args.game
-    config = eval(args.config) if args.config != "" else None
+    config = eval(args.config) if args.config != "none" else None
     glog.info(f"this is game: {game}")
     muzero = MuZero(game, config)
     muzero.train()
