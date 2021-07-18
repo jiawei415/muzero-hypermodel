@@ -14,7 +14,6 @@ class Debug:
         self.writer = writer
         self.noise_dim = int(self.config.hyper_inp_dim)
         self.actions_log = dict()
-        
         keys = []
         for i in self.game.legal_actions():
             keys.extend([f"mcts_action_{i}", f"model_action_{i}"])
@@ -74,15 +73,16 @@ class Debug:
             state_params_std = self.calculation_std(state_params)
             params_std = {"value_params": value_params_std, "reward_params": reward_params_std, "state_params": state_params_std}
         hypermodel_std = self.model.get_hypermodel()
-        self.debug_log(self.actions_log, params_std, hypermodel_std, counter)
+        self.debug_log(params_std, hypermodel_std, counter)
         self.game.close()
 
-    def debug_log(self, actions_log, debug_params, hypermodel_std, counter):
+    def debug_log(self, debug_params, hypermodel_std, counter):
         debug_log = []
-        for k, v in actions_log.items():
+        for k, v in self.actions_log.items():
             self.writer.add_histogram(f"5.Debug/{k}", numpy.array(v), counter)
             self.writer.add_scalar(f"5.Debug/{k}", numpy.mean(numpy.array(v)), counter)
             debug_log.append(v)
+            self.actions_log[k] = []
         for k, v  in debug_params.items():
             self.writer.add_scalar(f"5.Debug/{k}", v, counter )
             debug_log.append(v)
