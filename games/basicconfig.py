@@ -108,7 +108,6 @@ class BasicConfig():
         else:
             return 0.25
 
-
     def train_times(self, played_games):
         if played_games <= 10:
             return 100 # 200 if self.use_reanalyse else 100
@@ -125,6 +124,6 @@ class BasicConfig():
         elif self.train_mode == 2:
             train_times = int(self.target_update_freq * self.train_proportion)
         elif self.train_mode == 3:
-            train_proportion = self.train_proportion + played_steps / (self.max_moves * self.episode)
-            train_times = int(self.target_update_freq * train_proportion)
+            train_times = int(self.target_update_freq * self.train_proportion)
+            self.train_proportion = min(0.1 + self.train_proportion, 5.0)
         return train_times
