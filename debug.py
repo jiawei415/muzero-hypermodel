@@ -80,7 +80,7 @@ class Debug:
         debug_log = []
         for k, v in self.actions_log.items():
             self.writer.add_histogram(f"5.Debug/{k}", numpy.array(v), counter)
-            self.writer.add_scalar(f"5.Debug/{k}", numpy.mean(numpy.array(v)), counter)
+            self.writer.add_scalar(f"5.Debug/{k}_mean", numpy.mean(numpy.array(v)), counter)
             debug_log.append(v)
             self.actions_log[k] = []
         for k, v  in debug_params.items():
