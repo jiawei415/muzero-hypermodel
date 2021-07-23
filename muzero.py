@@ -23,9 +23,7 @@ class MuZero:
         # Load the game and the config from the module with the game name
         game_module = importlib.import_module("games." + game_name)
         self.config = game_module.MuZeroConfig()
-        self.config.game_filename = game_name
-        self.config.results_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "results/" + game_name + "_" + time.strftime("%Y%m%d%H%M%S", time.localtime()))
-        self.init_config(config)
+        self.init_config(game_name, config)
         # Fix random generator seed
         numpy.random.seed(self.config.seed)
         torch.manual_seed(self.config.seed)
@@ -58,7 +56,7 @@ class MuZero:
         self.test_worker = None
         self.debug_worker = None
 
-    def init_config(self, config):
+    def init_config(self, game_name, config):
         if config is not None:
             for k, v in config.items():
                 if k not in self.config.__dict__.keys():
@@ -67,6 +65,8 @@ class MuZero:
             if self.config.use_priormodel: self.config.priormodel = self.config.hypermodel
             if self.config.use_normalization: self.config.normalization = self.config.hypermodel
             if self.config.use_target_noise: self.config.target_noise = self.config.hypermodel
+        self.config.game_filename = game_name
+        self.config.results_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"results/{game_name}_{self.config.seed}_{time.strftime('%Y%m%d%H%M%S', time.localtime())}")
 
     def init_workers(self, log_in_tensorboard=True):
         if log_in_tensorboard or self.config.save_model:
@@ -129,7 +129,6 @@ class MuZero:
                     # for _ in tqdm(range(train_times)):
                     for _ in range(train_times):
                         if training_steps % self.config.checkpoint_interval == 0:
-                            self.debug()
                             self.shared_storage_worker.set_info(
                                 {
                                     "weights": copy.deepcopy(self.model.get_weights()),
@@ -157,6 +156,7 @@ class MuZero:
                 }
             )
             self.test()
+            self.debug()
             self.player_log(episode)
     
         self.terminate_workers()
@@ -184,7 +184,7 @@ class MuZero:
         )
         
     def debug(self):
-        counter = self.shared_storage_worker.get_info("training_steps")
+        counter = self.shared_storage_worker.get_info("played_steps")
         self.debug_worker.start_debug(counter)
 
     def player_log(self, counter):
