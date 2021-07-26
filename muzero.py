@@ -65,8 +65,13 @@ class MuZero:
             if self.config.use_priormodel: self.config.priormodel = self.config.hypermodel
             if self.config.use_normalization: self.config.normalization = self.config.hypermodel
             if self.config.use_target_noise: self.config.target_noise = self.config.hypermodel
+        [v, r, s] = self.config.hypermodel
+        log_path = f"results/{game_name}_{self.config.seed}"
+        if v == 1: log_path += '_v'
+        if r == 1: log_path += '_r'
+        if s == 1: log_path += '_s'
         self.config.game_filename = game_name
-        self.config.results_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"results/{game_name}_{self.config.seed}_{time.strftime('%Y%m%d%H%M%S', time.localtime())}")
+        self.config.results_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"{log_path}_{time.strftime('%Y%m%d%H%M%S', time.localtime())}")
 
     def init_workers(self, log_in_tensorboard=True):
         if log_in_tensorboard or self.config.save_model:
