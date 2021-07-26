@@ -65,6 +65,8 @@ for root, dirs, files in os.walk(tb_data_path):
         files = sorted(files)
         label = "muzero"
         config = pd.read_csv(os.path.join(root, files[0]), sep="\t")
+        seed = config[config.key == "seed"].value.to_list()[0]
+        # label += f"_{seed}"
         v, r, s = eval(config[config.key == "hypermodel"].value.to_list()[0])
         if v == 1: label += '_value'
         if r == 1: label += '_reward'
@@ -77,9 +79,16 @@ for root, dirs, files in os.walk(tb_data_path):
         player_logs = pd.read_csv(os.path.join(root, files[3]), sep="\t")
         trainer_logs = pd.read_csv(os.path.join(root, files[4]), sep="\t")
         for k, v in player_datas.items():
-            v[label] = player_logs[k].to_numpy()
+            if label in v.keys():
+                v[label].append(player_logs[k].to_numpy())
+            else:
+                v[label] = [player_logs[k].to_numpy()]
         for k, v in debug_datas.items():
-            v[label] = debug_logs[k].to_numpy()
+            if label in v.keys():
+                v[label].append(debug_logs[k].to_numpy())
+            else:
+                v[label] = [debug_logs[k].to_numpy()]
+            # v[label] = debug_logs[k].to_numpy()
             # debug_logs[k].plot(label=label)
             # plt.show()
         for k, v in action_datas.items():
@@ -103,7 +112,7 @@ for root, dirs, files in os.walk(tb_data_path):
         #         for item in tb_data.scalars.Items(key):
         #             xs[label].append(item.value)
 
-suffix = "value"
+suffix = "reward"
 wanted1 = ['muzero', f'muzero_{suffix}+hyper']
 wanted2 = [f'muzero_{suffix}+hyper', f'muzero_{suffix}+hyper+prior', f'muzero_{suffix}+hyper+normal', f'muzero_{suffix}+hyper+target', f'muzero_{suffix}+hyper+reg']
 wanted3 = [f'muzero_{suffix}+hyper+prior', f'muzero_{suffix}+hyper+prior+normal', f'muzero_{suffix}+hyper+prior+target', f'muzero_{suffix}+hyper+prior+normal+target']
@@ -120,8 +129,8 @@ def plot_scalar(xs, ys, xlabel, ylabel):
         for label in wanted:
             if label not in xs.keys():
                 continue
-            x = xs[label]
-            y = ys[label]
+            x = xs[label][0]
+            y = ys[label][0]
             smoothed_y = smooth(y)
             if len(x) != len(y):
                 x = range(0, len(y) * 100, 100)
@@ -145,7 +154,7 @@ def plot_scalar(xs, ys, xlabel, ylabel):
         # plt.savefig(f"./figures/{game_name}_{i}")
         plt.show()
 
-def plot_distribution(action_datas):
+def plot_action(action_datas):
     for i, wanted in enumerate(wanteds):
         for title in wanted:
             if title not in action_datas["mcts_action_0"].keys():
@@ -168,12 +177,73 @@ def plot_distribution(action_datas):
             plt.tight_layout()
             plt.show()
 
-plot_scalar(played_step, test_reward, 'played step', 'total reward')
-if "value" in suffix:
-    plot_scalar(training_step, value_params_std, 'training step', 'value_params_std')
-if "reward" in suffix:
-    plot_scalar(training_step, reward_params_std, 'training step', 'reward_params_std')
-if "state" in suffix:
-    plot_scalar(training_step, state_params_std, 'training step', 'state_params_std')
+def plot_reward(xs, ys, xlabel, ylabel):
+    for i, wanted in enumerate([wanted2]):
+        plt.figure(figsize=(6, 4))
+        for label in wanted:
+            if label not in xs.keys():
+                continue
+            x = xs[label][0]
+            y_matrix = np.vstack(ys[label])
+            y_min = smooth(np.min(y_matrix, axis=0), 0.9)
+            y_max= smooth(np.max(y_matrix, axis=0), 0.9)
+            y = smooth(np.mean(y_matrix, axis=0), 0.9)
+            plt.plot(x, y, label=label)
+            plt.fill_between(x, y_min, y_max, alpha=0.9)
 
-plot_distribution(action_datas)
+            plt.xticks(fontsize=16)
+            plt.yticks(fontsize=16)
+
+            plt.xlabel(xlabel, fontsize=20)
+            plt.ylabel(ylabel, fontsize=20)
+
+            plt.title(f"{game_name}")
+            plt.grid()
+            # plt.legend(bbox_to_anchor=(0.5, -0.5), loc=8, borderaxespad=0, fontsize=16,)
+            plt.legend(loc='upper left', handlelength=5, borderpad=1.2, labelspacing=1.2)
+            plt.tight_layout()
+            # plt.savefig(f"./figures/{game_name}_{i}")
+            plt.show()
+
+def plot_params(xs, ys, xlabel, ylabel):
+    for i, wanted in enumerate([wanted2]):
+        plt.figure(figsize=(6, 4))
+        for label in wanted:
+            if label not in xs.keys():
+                continue
+            x = xs[label][0]
+            y_matrix = np.vstack(ys[label])
+            y_min = smooth(np.min(y_matrix, axis=0))
+            y_max= smooth(np.max(y_matrix, axis=0))
+            y = smooth(np.mean(y_matrix, axis=0))
+            plt.plot(x, y, label=label)
+            plt.fill_between(x, y_min, y_max, alpha=0.9)
+
+            plt.xticks(fontsize=16)
+            plt.yticks(fontsize=16)
+
+            plt.xlabel(xlabel, fontsize=20)
+            plt.ylabel(ylabel, fontsize=20)
+
+            plt.title(f"{game_name}")
+            plt.grid()
+            # plt.legend(bbox_to_anchor=(0.5, -0.5), loc=8, borderaxespad=0, fontsize=16,)
+            plt.legend(loc='upper left', handlelength=5, borderpad=1.2, labelspacing=1.2)
+            plt.tight_layout()
+            # plt.savefig(f"./figures/{game_name}_{i}")
+            plt.show()
+
+
+# plot_scalar(played_step, test_reward, 'played step', 'total reward')
+plot_reward(played_step, test_reward, 'played step', 'total reward')
+if "value" in suffix:
+    # plot_scalar(played_step, value_params_std, 'training step', 'value_params_std')
+    plot_params(played_step, value_params_std, 'played step', 'value_params_std')
+if "reward" in suffix:
+    # plot_scalar(played_step, reward_params_std, 'training step', 'reward_params_std')
+    plot_params(played_step, reward_params_std, 'played step', 'reward_params_std')
+if "state" in suffix:
+    # plot_scalar(played_step, state_params_std, 'training step', 'state_params_std')
+    plot_params(played_step, state_params_std, 'played step', 'state_params_std')
+
+plot_action(action_datas)
