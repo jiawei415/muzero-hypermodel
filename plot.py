@@ -112,7 +112,7 @@ for root, dirs, files in os.walk(tb_data_path):
         #         for item in tb_data.scalars.Items(key):
         #             xs[label].append(item.value)
 
-suffix = "reward"
+suffix = "value"
 wanted1 = ['muzero', f'muzero_{suffix}+hyper']
 wanted2 = [f'muzero_{suffix}+hyper', f'muzero_{suffix}+hyper+prior', f'muzero_{suffix}+hyper+normal', f'muzero_{suffix}+hyper+target', f'muzero_{suffix}+hyper+reg']
 wanted3 = [f'muzero_{suffix}+hyper+prior', f'muzero_{suffix}+hyper+prior+normal', f'muzero_{suffix}+hyper+prior+target', f'muzero_{suffix}+hyper+prior+normal+target']
@@ -146,7 +146,7 @@ def plot_scalar(xs, ys, xlabel, ylabel):
             plt.xlabel(xlabel, fontsize=20)
             plt.ylabel(ylabel, fontsize=20)
 
-        plt.title(f"{game_name}")
+        plt.title(f"{game_name}_{seed}")
         plt.grid()
         # plt.legend(bbox_to_anchor=(0.5, -0.5), loc=8, borderaxespad=0, fontsize=16,)
         plt.legend(loc='upper left', handlelength=5, borderpad=1.2, labelspacing=1.2)
@@ -171,14 +171,15 @@ def plot_action(action_datas):
         
             plt.xlabel("training step", fontsize=10)
             plt.ylabel("action probability", fontsize=10)
-            plt.title(f"{game_name}_{title}")
+            plt.title(f"{game_name}_{seed}_{title}")
             # plt.legend(bbox_to_anchor=(0.5, -0.5), loc=8, borderaxespad=0, fontsize=16,)
             plt.legend(loc='upper left', handlelength=5, borderpad=1.2, labelspacing=1.2)
             plt.tight_layout()
+            plt.savefig(f"./figures/{game_name}_{seed}_{title}")
             plt.show()
 
-def plot_reward(xs, ys, xlabel, ylabel):
-    for i, wanted in enumerate([wanted2]):
+def plot_reward(xs, ys):
+    for i, wanted in enumerate([wanted1, wanted2]):
         plt.figure(figsize=(6, 4))
         for label in wanted:
             if label not in xs.keys():
@@ -189,25 +190,21 @@ def plot_reward(xs, ys, xlabel, ylabel):
             y_max= smooth(np.max(y_matrix, axis=0), 0.9)
             y = smooth(np.mean(y_matrix, axis=0), 0.9)
             x = xs[label][0][:min_len]
-            plt.plot(x, y, label=label)
-            plt.fill_between(x, y_min, y_max, alpha=0.9)
+            plt.plot(x, y, color='#1f77b4', label=label)
+            plt.fill_between(x, y_min, y_max, color='#1f77b4', alpha=0.9)
 
-            plt.xticks(fontsize=16)
-            plt.yticks(fontsize=16)
-
-            plt.xlabel(xlabel, fontsize=20)
-            plt.ylabel(ylabel, fontsize=20)
+            plt.xlabel('smaple num')
+            plt.ylabel('total reward')
 
             plt.title(f"{game_name}")
             plt.grid()
-            # plt.legend(bbox_to_anchor=(0.5, -0.5), loc=8, borderaxespad=0, fontsize=16,)
             plt.legend(loc='upper left', handlelength=5, borderpad=1.2, labelspacing=1.2)
             plt.tight_layout()
-            # plt.savefig(f"./figures/{game_name}_{i}")
+            plt.savefig(f"./figures/1_{game_name}_{label}")
             plt.show()
 
-def plot_params(xs, ys, xlabel, ylabel):
-    for i, wanted in enumerate([wanted2]):
+def plot_params(xs, ys):
+    for i, wanted in enumerate([wanted1, wanted2]):
         plt.figure(figsize=(6, 4))
         for label in wanted:
             if label not in xs.keys():
@@ -218,34 +215,68 @@ def plot_params(xs, ys, xlabel, ylabel):
             y_max= smooth(np.max(y_matrix, axis=0))
             y = smooth(np.mean(y_matrix, axis=0))
             x = xs[label][0][:min_len]
-            plt.plot(x, y, label=label)
-            plt.fill_between(x, y_min, y_max, alpha=0.9)
+            plt.plot(x, y, color='#ff7f0e', label=label)
+            plt.fill_between(x, y_min, y_max, color='#ff7f0e', alpha=0.9)
 
-            plt.xticks(fontsize=16)
-            plt.yticks(fontsize=16)
-
-            plt.xlabel(xlabel, fontsize=20)
-            plt.ylabel(ylabel, fontsize=20)
+            plt.xlabel('smaple num')
+            plt.ylabel('param variance')
 
             plt.title(f"{game_name}")
             plt.grid()
-            # plt.legend(bbox_to_anchor=(0.5, -0.5), loc=8, borderaxespad=0, fontsize=16,)
             plt.legend(loc='upper left', handlelength=5, borderpad=1.2, labelspacing=1.2)
             plt.tight_layout()
-            # plt.savefig(f"./figures/{game_name}_{i}")
+            plt.savefig(f"./figures/2_{game_name}_{label}")
             plt.show()
+
+def plot_reward_and_params(xs, ys1, ys2):
+    smooth_weight = 0.8
+    for i, label in enumerate(wanted1 + wanted2):
+        fig = plt.figure(figsize=(6, 4))
+        ax1 = fig.add_subplot()
+        if label not in xs.keys():
+            continue
+        min_len = min([len(y) for y in ys1[label]])
+        x = xs[label][0][:min_len]
+        y1_matrix = np.vstack([y[:min_len] for y in ys1[label]])
+        y1_min = smooth(np.min(y1_matrix, axis=0), smooth_weight)
+        y1_max= smooth(np.max(y1_matrix, axis=0), smooth_weight)
+        y1 = smooth(np.mean(y1_matrix, axis=0), smooth_weight)
+        lns1 = ax1.plot(x, y1, color='#1f77b4', label='reward')
+        ax1.fill_between(x, y1_min, y1_max, color='#1f77b4', alpha=0.9)
+        ax1.set_xlabel('smaple num')
+        ax1.set_ylabel('total reward')
+        
+        ax2 = ax1.twinx()
+        y2_matrix = np.vstack([y[:min_len] for y in ys2[label]])
+        y2_min = smooth(np.min(y2_matrix, axis=0), smooth_weight)
+        y2_max= smooth(np.max(y2_matrix, axis=0), smooth_weight)
+        y2 = smooth(np.mean(y2_matrix, axis=0), smooth_weight)
+        lns2 = ax2.plot(x, y2, color='#ff7f0e', label='variance')
+        ax2.fill_between(x, y2_min, y2_max, color='#ff7f0e', alpha=0.9)
+        ax2.set_ylabel('param variance')
+        lns = lns1+lns2
+        labs = [l.get_label() for l in lns]
+        ax1.legend(lns, labs, loc='upper left', handlelength=5, borderpad=1.2, labelspacing=1.2)
+        plt.title(f"{game_name}_{label}")
+        plt.grid()
+        plt.tight_layout()
+        plt.savefig(f"./figures/0_{game_name}_{label}")
+        plt.show()
 
 
 # plot_scalar(played_step, test_reward, 'played step', 'total reward')
-plot_reward(played_step, test_reward, 'played step', 'total reward')
+plot_reward(played_step, test_reward)
 if "value" in suffix:
     # plot_scalar(played_step, value_params_std, 'training step', 'value_params_std')
-    plot_params(played_step, value_params_std, 'played step', 'value_params_std')
+    plot_params(played_step, value_params_std)
+    plot_reward_and_params(played_step, test_reward, value_params_std)
 if "reward" in suffix:
     # plot_scalar(played_step, reward_params_std, 'training step', 'reward_params_std')
-    plot_params(played_step, reward_params_std, 'played step', 'reward_params_std')
+    plot_params(played_step, reward_params_std)
+    plot_reward_and_params(played_step, test_reward, reward_params_std)
 if "state" in suffix:
     # plot_scalar(played_step, state_params_std, 'training step', 'state_params_std')
-    plot_params(played_step, state_params_std, 'played step', 'state_params_std')
+    plot_params(played_step, state_params_std)
+    plot_reward_and_params(played_step, test_reward, state_params_std)
 
 plot_action(action_datas)
