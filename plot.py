@@ -183,11 +183,12 @@ def plot_reward(xs, ys, xlabel, ylabel):
         for label in wanted:
             if label not in xs.keys():
                 continue
-            x = xs[label][0]
-            y_matrix = np.vstack(ys[label])
+            min_len = min([len(y) for y in ys[label]])
+            y_matrix = np.vstack([y[:min_len] for y in ys[label]])
             y_min = smooth(np.min(y_matrix, axis=0), 0.9)
             y_max= smooth(np.max(y_matrix, axis=0), 0.9)
             y = smooth(np.mean(y_matrix, axis=0), 0.9)
+            x = xs[label][0][:min_len]
             plt.plot(x, y, label=label)
             plt.fill_between(x, y_min, y_max, alpha=0.9)
 
@@ -211,11 +212,12 @@ def plot_params(xs, ys, xlabel, ylabel):
         for label in wanted:
             if label not in xs.keys():
                 continue
-            x = xs[label][0]
-            y_matrix = np.vstack(ys[label])
+            min_len = min([len(y) for y in ys[label]])
+            y_matrix = np.vstack([y[:min_len] for y in ys[label]])
             y_min = smooth(np.min(y_matrix, axis=0))
             y_max= smooth(np.max(y_matrix, axis=0))
             y = smooth(np.mean(y_matrix, axis=0))
+            x = xs[label][0][:min_len]
             plt.plot(x, y, label=label)
             plt.fill_between(x, y_min, y_max, alpha=0.9)
 
