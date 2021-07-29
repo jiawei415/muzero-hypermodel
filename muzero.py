@@ -40,6 +40,11 @@ class MuZero:
             "played_games": 0,
             "played_steps": 0,
             "training_steps": 0,
+            "total_loss": 0,
+            "value_loss": 0,
+            "reward_loss": 0,
+            "policy_loss": 0,
+            "lr": 0,
             "terminate": False,
         }
         # self.replay_buffer = {}
@@ -65,11 +70,11 @@ class MuZero:
             if self.config.use_priormodel: self.config.priormodel = self.config.hypermodel
             if self.config.use_normalization: self.config.normalization = self.config.hypermodel
             if self.config.use_target_noise: self.config.target_noise = self.config.hypermodel
-        [v, r, s] = self.config.hypermodel
         log_path = f"results/{game_name}_{self.config.seed}"
-        if v == 1: log_path += '_v'
-        if r == 1: log_path += '_r'
-        if s == 1: log_path += '_s'
+        # [v, r, s] = self.config.hypermodel
+        # if v == 1: log_path += '_v'
+        # if r == 1: log_path += '_r'
+        # if s == 1: log_path += '_s'
         self.config.game_filename = game_name
         self.config.results_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"{log_path}_{time.strftime('%Y%m%d%H%M%S', time.localtime())}")
 
@@ -97,6 +102,11 @@ class MuZero:
                 "played_games",
                 "played_steps",
                 "training_steps",
+                "total_loss", 
+                "value_loss",
+                "reward_loss",
+                "policy_loss",
+                "lr"
             ]
             self.palyer_logs_path = self.config.results_path + "/palyer_logs.csv"
             self.palyer_logs = pd.DataFrame(columns=self.keys)
@@ -115,6 +125,7 @@ class MuZero:
 
     def train(self, log_in_tensorboard=True):
         self.init_workers(log_in_tensorboard=log_in_tensorboard)
+        self.start_train = False
         played_games = 0
         played_steps = 0
         training_steps = 0
@@ -129,7 +140,8 @@ class MuZero:
                 )
                 played_steps += 1
                 self.shared_storage_worker.set_info({"played_steps": played_steps})
-                if played_games >= self.config.start_train and played_steps % self.config.train_frequency == 0:       
+                if played_games >= self.config.start_train and played_steps % self.config.train_frequency == 0:
+                    self.start_train = True     
                     train_times = self.config.train_per_paly(played_steps)
                     # for _ in tqdm(range(train_times)):
                     for _ in range(train_times):
@@ -144,7 +156,7 @@ class MuZero:
                             )
                             if self.config.save_model: self.shared_storage_worker.save_checkpoint()
                         index_batch, batch = self.replay_buffer_worker.get_batch()
-                        priorities = self.training_worker.train_game(batch, training_steps)
+                        priorities, losses = self.training_worker.train_game(batch, training_steps)
                         if self.config.PER:
                             self.replay_buffer_worker.update_priorities(priorities, index_batch)
                         training_steps += 1
@@ -160,9 +172,12 @@ class MuZero:
                     "train_episode_length": len(game_history.action_history) - 1,
                 }
             )
+            if self.start_train:
+                self.shared_storage_worker.set_info(losses)
+                self.shared_storage_worker.set_info({"lr": self.optimizer.param_groups[0]["lr"]})
             self.test()
             self.debug()
-            self.player_log(episode)
+            self.run_log(episode)
     
         self.terminate_workers()
 
@@ -192,7 +207,7 @@ class MuZero:
         counter = self.shared_storage_worker.get_info("played_steps")
         self.debug_worker.start_debug(counter)
 
-    def player_log(self, counter):
+    def run_log(self, counter):
         info = self.shared_storage_worker.get_info(self.keys)
         palyer_log = [
             info["train_total_reward"],
@@ -204,6 +219,11 @@ class MuZero:
             info["played_games"],
             info["played_steps"],
             info["training_steps"],
+            info["total_loss"],
+            info["value_loss"],
+            info["reward_loss"],
+            info["policy_loss"],
+            info["lr"],
         ]
         self.palyer_logs.loc[counter] = palyer_log
         self.palyer_logs.to_csv(self.palyer_logs_path, sep="\t", index=False)
@@ -220,9 +240,16 @@ class MuZero:
         self.writer.add_scalar("3.Workers/2.Played_steps", info["played_steps"], counter)
         self.writer.add_scalar("3.Workers/3.Training_steps", info["training_steps"], counter)
         self.writer.add_scalar("3.Workers/4.Training_steps_per_played_step_ratio",
-            info["training_steps"] / max(1, info["played_steps"]),
-            counter,
+            info["training_steps"] / max(1, info["played_steps"]), counter,
         )
+        
+        if self.start_train:
+            self.writer.add_scalar("4.Trainer/1.Total_loss", info["total_loss"], counter)
+            self.writer.add_scalar("4.Trainer/2.Value_loss", info["value_loss"], counter)
+            self.writer.add_scalar("4.Trainer/3.Reward_loss", info["reward_loss"], counter)
+            self.writer.add_scalar("4.Trainer/4.Policy_loss", info["policy_loss"], counter)
+            self.writer.add_scalar("4.Trainer/5.Learning_rate", info["lr"], counter)
+
         print(
             f'Test reward: {info["test_total_reward"]}. ' +
             f'Train reward: {info["train_total_reward"]}. ' +

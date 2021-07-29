@@ -19,10 +19,10 @@ class Trainer:
         self.optimizer = optimizer
         self.writer = writer
         
-        keys = ["total_loss", "value_loss", "reward_loss", "policy_loss", "lr",]
-        self.trainer_logs_path = self.config.results_path + "/trainer_logs.csv"
-        self.trainer_logs = pd.DataFrame(columns=keys)
-        self.trainer_logs.to_csv(self.trainer_logs_path, sep="\t", index=False)
+        # keys = ["total_loss", "value_loss", "reward_loss", "policy_loss", "lr",]
+        # self.trainer_logs_path = self.config.results_path + "/trainer_logs.csv"
+        # self.trainer_logs = pd.DataFrame(columns=keys)
+        # self.trainer_logs.to_csv(self.trainer_logs_path, sep="\t", index=False)
 
     def trainer_log(self, losses, counter):
         lr = self.optimizer.param_groups[0]["lr"]
@@ -50,9 +50,9 @@ class Trainer:
         self.update_lr(training_step)
         priorities, losses = self.update_weights(batch)  
         
-        if training_step % self.config.checkpoint_interval == 0:
-            self.trainer_log(losses, training_step)
-        return priorities
+        # if training_step % self.config.checkpoint_interval == 0:
+        #     self.trainer_log(losses, training_step)
+        return priorities, losses
 
     def update_weights(self, batch):
         """
