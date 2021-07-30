@@ -122,8 +122,8 @@ class BasicConfig():
         if self.train_mode == 1:
             train_times = int(played_steps * self.train_proportion)
         elif self.train_mode == 2:
-            train_times = int(self.target_update_freq * self.train_proportion)
+            train_times = int(self.train_frequency * self.train_proportion)
         elif self.train_mode == 3:
-            train_times = int(self.target_update_freq * self.train_proportion)
+            train_times = int(self.train_frequency * self.train_proportion)
             self.train_proportion = min(0.1 + self.train_proportion, 5.0)
         return train_times
