@@ -121,7 +121,7 @@ class MuZero:
         self.training_worker = trainer.Trainer(self.model, self.target_model, self.optimizer, self.config, self.writer)
         self.self_play_worker = self_play.SelfPlay(self.model, self.config)
         self.test_worker = self_play.TestPlay(self.model, self.config)
-        self.debug_worker = debug.Debug(self.model, self.config, self.writer)
+        self.debug_worker = debug.Debug(self.model, self.target_model, self.config, self.writer)
 
     def train(self, log_in_tensorboard=True):
         self.init_workers(log_in_tensorboard=log_in_tensorboard)

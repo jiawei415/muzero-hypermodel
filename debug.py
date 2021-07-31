@@ -1,20 +1,23 @@
+from math import gamma
 import numpy
 import torch
 import importlib
 import pandas as pd
-from utils import MCTS, GameHistory
+from utils import MCTS, GameHistory, support_to_scalar
 
 class Debug:
-    def __init__(self, model, config, writer):
+    def __init__(self, model, target_model, config, writer):
         self.config = config
         game_module = importlib.import_module("games." + self.config.game_filename)
         Game = game_module.Game
         self.game = Game(self.config.seed)
         self.model = model
+        self.target_model = target_model
         self.writer = writer
         self.noise_dim = int(self.config.hyper_inp_dim)
         self.actions_log = dict()
-        keys = ["counter"]
+        self.value_log = {"mcts_value":[], "target_model_value":[], "model_value":[]}
+        keys = ["counter", "mcts_value", "target_model_value", "model_value"]
         for i in self.game.legal_actions():
             keys.extend([f"mcts_action_{i}", f"model_action_{i}"])
             self.actions_log[f"mcts_action_{i}"] = []
@@ -47,15 +50,23 @@ class Debug:
                     self.game.to_play(),
                     True,
                 )
+                self.value_log['mcts_value'].append(root.value())
                 debug_observations = (
                     torch.tensor(stacked_observations)
                     .float()
                     .unsqueeze(0)
                     .to(next(self.model.parameters()).device)
                 )
-                _, _, debug_logits, _, _ = self.model.initial_inference(
+                target_model_value, _, _, _, _ = self.target_model.initial_inference(
                         debug_observations, torch.tensor(noise_z, dtype=torch.float)
                     )
+                target_model_value = support_to_scalar(target_model_value, self.config.support_size).item()
+                self.value_log['target_model_value'].append(target_model_value)
+                model_value, _, debug_logits, _, _ = self.model.initial_inference(
+                        debug_observations, torch.tensor(noise_z, dtype=torch.float)
+                    )
+                model_value = support_to_scalar(model_value, self.config.support_size).item()
+                self.value_log['model_value'].append(model_value)
                 debug_policy = torch.softmax(debug_logits, dim=1).squeeze()
                 for i in self.config.action_space:
                     self.actions_log[f"mcts_action_{i}"].append(root.children[i].prior)
@@ -78,16 +89,21 @@ class Debug:
 
     def debug_log(self, debug_params, hypermodel_std, counter):
         debug_log = [counter]
+        for k, v in self.value_log.items():
+            self.writer.add_histogram(f"5.Debug/value/{k}", numpy.array(v), counter)
+            self.writer.add_scalar(f"5.Debug/value/{k}_mean", numpy.mean(numpy.array(v)), counter)
+            debug_log.append(v)
+            self.value_log[k] = []
         for k, v in self.actions_log.items():
-            self.writer.add_histogram(f"5.Debug/{k}", numpy.array(v), counter)
-            self.writer.add_scalar(f"5.Debug/{k}_mean", numpy.mean(numpy.array(v)), counter)
+            self.writer.add_histogram(f"5.Debug/action/{k}", numpy.array(v), counter)
+            self.writer.add_scalar(f"5.Debug/action/{k}_mean", numpy.mean(numpy.array(v)), counter)
             debug_log.append(v)
             self.actions_log[k] = []
         for k, v  in debug_params.items():
-            self.writer.add_scalar(f"5.Debug/{k}", v, counter )
+            self.writer.add_scalar(f"5.Debug/params/{k}", v, counter )
             debug_log.append(v)
         for k, v  in hypermodel_std.items():
-            self.writer.add_scalar(f"5.Debug/{k}", v, counter )
+            self.writer.add_scalar(f"5.Debug/params/{k}", v, counter )
             debug_log.append(v)
         self.debug_logs.loc[counter] = debug_log
         self.debug_logs.to_csv(self.debug_logs_path, sep="\t", index=False)
