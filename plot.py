@@ -23,7 +23,7 @@ loss_datas = {
 debug_datas = {
     "value_params.weight": value_params_std,
     "reward_params.weight": reward_params_std,
-    "state_params.weight": state_params_std,  
+    "state_params.weight": state_params_std,
 }
 action_datas = {
     "mcts_action_0": mcts_action_0,
@@ -55,10 +55,11 @@ def gen_ydata(ys, min_len, weight):
     return y, y_min, y_max
 
 game_name = "deepsea"
-log_path = f"./results/{game_name}/20210729/"
+time_tag = "2021073102"
+log_path = f"./results/{game_name}/{time_tag}"
 labels = {"+hyper": "hypermodel", "+prior": "priormodel", "+normal": "normalization", "+target": "target_noise", "+reg": "use_reg_loss"}
 
-for root, dirs, files in os.walk(log_path): 
+for root, dirs, files in os.walk(log_path):
     for name in dirs:
         print(os.path.join(root, name))
     if len(files) != 0:
@@ -107,7 +108,7 @@ for root, dirs, files in os.walk(log_path):
                     v_mean[label].append(v[label][2])
                 else:
                     v_mean[label] = [v[label][2]]
-        # tb_data = event_accumulator.EventAccumulator(os.path.join(root, files[2])) 
+        # tb_data = event_accumulator.EventAccumulator(os.path.join(root, files[2]))
         # tb_data.Reload()
         # keys = tb_data.scalars.Keys()
         # for key in keys:
@@ -156,7 +157,7 @@ def plot_action(xs, action_datas):
                     y_max = np.array(action_data[label][1])
                     plt.plot(x, y, label=action)
                     plt.fill_between(x, y_min, y_max, alpha=0.9)
-        
+
             plt.xlabel("smaple num")
             plt.ylabel("action probability")
             plt.title(f"{game_name}_seed{seed}_{label}")
@@ -215,44 +216,45 @@ def plot_all(xs, action, scalar):
 
         plt.xlabel('smaple num')
         plt.subplots_adjust(wspace=0, hspace=0.2)
-        # plt.savefig(f"./figures/{game_name}_{label}")
+        plt.savefig(f"./figures/{time_tag}_{game_name}_{label}")
         plt.show()
 
-suffix = "reward"
-wanted1 = ['muzero', f'muzero_{suffix}+hyper']
-wanted2 = [f'muzero_{suffix}+hyper', f'muzero_{suffix}+hyper+prior', f'muzero_{suffix}+hyper+normal', f'muzero_{suffix}+hyper+target', f'muzero_{suffix}+hyper+reg']
-wanted3 = [f'muzero_{suffix}+hyper+prior', f'muzero_{suffix}+hyper+prior+normal', f'muzero_{suffix}+hyper+prior+target', f'muzero_{suffix}+hyper+prior+normal+target']
-wanted4 = [f'muzero_{suffix}+hyper+normal', f'muzero_{suffix}+hyper+prior+normal', f'muzero_{suffix}+hyper+normal+target', f'muzero_{suffix}+hyper+prior+normal+target']
-wanted5 = [f'muzero_{suffix}+hyper+target', f'muzero_{suffix}+hyper+prior+target', f'muzero_{suffix}+hyper+normal+target', f'muzero_{suffix}+hyper+prior+normal+target']
-wanted6 = ['muzero', f'muzero_{suffix}+hyper', f'muzero_{suffix}+hyper+prior+normal+target+reg']
-wanteds = [wanted1, wanted2, wanted3, wanted4, wanted5]
 
 # COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
 COLORS = ['green', 'red','blue', 'orange', 'darkred', 'darkblue', 'black', 'yellow', 'magenta', 'cyan', 'purple', 'pink',
           'brown', 'orange', 'teal', 'lightblue', 'lime', 'lavender', 'turquoise',
           'green', 'tan', 'salmon', 'gold']
 
-if "value" in suffix: params_std = value_params_std
-if "reward" in suffix: params_std = reward_params_std
-if "state" in suffix: params_std = state_params_std
+for suffix in ["value", "reward", "state"]:
+    wanted1 = ['muzero', f'muzero_{suffix}+hyper']
+    wanted2 = [f'muzero_{suffix}+hyper', f'muzero_{suffix}+hyper+prior', f'muzero_{suffix}+hyper+normal', f'muzero_{suffix}+hyper+target', f'muzero_{suffix}+hyper+reg']
+    wanted3 = [f'muzero_{suffix}+hyper+prior', f'muzero_{suffix}+hyper+prior+normal', f'muzero_{suffix}+hyper+prior+target', f'muzero_{suffix}+hyper+prior+normal+target']
+    wanted4 = [f'muzero_{suffix}+hyper+normal', f'muzero_{suffix}+hyper+prior+normal', f'muzero_{suffix}+hyper+normal+target', f'muzero_{suffix}+hyper+prior+normal+target']
+    wanted5 = [f'muzero_{suffix}+hyper+target', f'muzero_{suffix}+hyper+prior+target', f'muzero_{suffix}+hyper+normal+target', f'muzero_{suffix}+hyper+prior+normal+target']
+    wanted6 = ['muzero', f'muzero_{suffix}+hyper', f'muzero_{suffix}+hyper+prior+normal+target+reg']
+    wanteds = [wanted1, wanted2, wanted3, wanted4, wanted5]
 
-scalars = {
-    "total reward": test_reward,
-    f"{suffix} variance": params_std,
-    "value loss": value_loss,
-    "reward loss": reward_loss,
-}
-plot_all(played_step, action_mean_datas, scalars)
+    if "value" in suffix: params_std = value_params_std
+    if "reward" in suffix: params_std = reward_params_std
+    if "state" in suffix: params_std = state_params_std
 
-# plot_scalar(played_step, test_reward, 'total reward', 0.9)
-# plot_scalar(played_step, params_std, f"{suffix} variance", 0.6)
-# plot_scalar(played_step, value_loss, "value loss", 0.6)
-# plot_action(played_step, action_datas)
+    scalars = {
+        "total reward": test_reward,
+        f"{suffix} variance": params_std,
+        "value loss": value_loss,
+        "reward loss": reward_loss,
+    }
+    plot_all(played_step, action_mean_datas, scalars)
 
-# plot_distribution(played_step, test_reward, "total reward", 0.9)
-# plot_distribution(played_step, params_std, f"{suffix} variance", 0.6)
-# plot_distribution(played_step, value_loss, "value loss")
+    # plot_scalar(played_step, test_reward, 'total reward', 0.9)
+    # plot_scalar(played_step, params_std, f"{suffix} variance", 0.6)
+    # plot_scalar(played_step, value_loss, "value loss", 0.6)
+    # plot_action(played_step, action_datas)
 
-# plot_distribution(played_step, test_reward, "total reward", 0.9, False)
-# plot_distribution(played_step, params_std, f"{suffix} variance", 0.6, False)
-# plot_distribution(played_step, value_loss, "value loss", 0.6, False)
+    # plot_distribution(played_step, test_reward, "total reward", 0.9)
+    # plot_distribution(played_step, params_std, f"{suffix} variance", 0.6)
+    # plot_distribution(played_step, value_loss, "value loss")
+
+    # plot_distribution(played_step, test_reward, "total reward", 0.9, False)
+    # plot_distribution(played_step, params_std, f"{suffix} variance", 0.6, False)
+    # plot_distribution(played_step, value_loss, "value loss", 0.6, False)
