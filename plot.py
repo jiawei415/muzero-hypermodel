@@ -38,7 +38,7 @@ action_mean_datas = {
     "mcts_action_mean_2": mcts_action_mean_2,
 }
 value_datas = {
-    "mcts_value": mcts_value,
+    # "mcts_value": mcts_value,
     "target_model_value": target_model_value,
     "model_value": model_value,
 }
@@ -259,12 +259,12 @@ COLORS = ['darkgreen', 'darkred', 'lightblue', 'green', 'red','blue', 'orange', 
           'brown', 'orange', 'teal', 'lightblue', 'lime', 'lavender', 'tan']
 
 for suffix in ["p_value", "p_reward", "p_state", "np_value", "np_reward", "np_state"]:
-    wanted1 = ['muzero', f'muzero_{suffix}+hyper']
+    wanted1 = ['muzero_p', 'muzero_np']
     wanted2 = [f'muzero_{suffix}+hyper', f'muzero_{suffix}+hyper+prior', f'muzero_{suffix}+hyper+normal', f'muzero_{suffix}+hyper+target', f'muzero_{suffix}+hyper+reg']
     wanted3 = [f'muzero_{suffix}+hyper+prior', f'muzero_{suffix}+hyper+prior+normal', f'muzero_{suffix}+hyper+prior+target', f'muzero_{suffix}+hyper+prior+normal+target']
     wanted4 = [f'muzero_{suffix}+hyper+normal', f'muzero_{suffix}+hyper+prior+normal', f'muzero_{suffix}+hyper+normal+target', f'muzero_{suffix}+hyper+prior+normal+target']
     wanted5 = [f'muzero_{suffix}+hyper+target', f'muzero_{suffix}+hyper+prior+target', f'muzero_{suffix}+hyper+normal+target', f'muzero_{suffix}+hyper+prior+normal+target']
-    wanted6 = ['muzero', f'muzero_{suffix}+hyper', f'muzero_{suffix}+hyper+prior+normal+target+reg']
+    wanted6 = [f'muzero_{suffix}+hyper', f'muzero_{suffix}+hyper+prior+normal+target+reg']
     wanteds = [wanted1, wanted2, wanted3, wanted4, wanted5]
 
     if "value" in suffix: params_std = value_params_std
