@@ -9,6 +9,8 @@ test_reward, value_params_std, reward_params_std, state_params_std = {}, {}, {},
 total_loss, value_loss, reward_loss, policy_loss = {}, {}, {}, {}
 mcts_action_0, mcts_action_1, mcts_action_2 = {}, {}, {}
 mcts_action_mean_0, mcts_action_mean_1, mcts_action_mean_2 = {}, {}, {}
+mcts_value, target_model_value, model_value = {}, {}, {}
+mcts_value_mean, target_model_value_mean, model_value_mean = {}, {}, {}
 player_datas = {
     "played_steps": played_step,
     "training_steps": training_step,
@@ -35,6 +37,16 @@ action_mean_datas = {
     "mcts_action_mean_1": mcts_action_mean_1,
     "mcts_action_mean_2": mcts_action_mean_2,
 }
+value_datas = {
+    "mcts_value": mcts_value,
+    "target_model_value": target_model_value,
+    "model_value": model_value,
+}
+value_mean_datas = {
+    # "mcts_value": mcts_value_mean,
+    "target_model_value": target_model_value_mean,
+    "model_value": model_value_mean,
+}
 
 def smooth(scalar, weight=0.6):
     last = scalar[0]
@@ -55,7 +67,8 @@ def gen_ydata(ys, min_len, weight):
     return y, y_min, y_max
 
 game_name = "deepsea"
-time_tag = "2021073102"
+action_num = 2
+time_tag = "20210801"
 log_path = f"./results/{game_name}/{time_tag}"
 labels = {"+hyper": "hypermodel", "+prior": "priormodel", "+normal": "normalization", "+target": "target_noise", "+reg": "use_reg_loss"}
 
@@ -68,6 +81,7 @@ for root, dirs, files in os.walk(log_path):
         config = pd.read_csv(os.path.join(root, files[0]), sep="\t")
         seed = config[config.key == "seed"].value.to_list()[0]
         # label += f"_{seed}"
+        label += "_p" if eval(config[config.key == "PER"].value.to_list()[0]) else "_np"
         v, r, s = eval(config[config.key == "hypermodel"].value.to_list()[0])
         if v == 1: label += '_value'
         if r == 1: label += '_reward'
@@ -97,6 +111,18 @@ for root, dirs, files in os.walk(log_path):
             else:
                 v[label] = [debug_logs[k].to_numpy()]
         for (k, v), (k_mean, v_mean) in zip(action_datas.items(), action_mean_datas.items()):
+            if k in debug_logs.columns:
+                v[label] = [[], [], []]
+                for prob in debug_logs[k]:
+                    data = np.array(eval(prob))
+                    v[label][0].append(np.min(data))
+                    v[label][1].append(np.max(data))
+                    v[label][2].append(np.mean(data))
+                if label in v_mean.keys():
+                    v_mean[label].append(v[label][2])
+                else:
+                    v_mean[label] = [v[label][2]]
+        for (k, v), (k_mean, v_mean) in zip(value_datas.items(), value_mean_datas.items()):
             if k in debug_logs.columns:
                 v[label] = [[], [], []]
                 for prob in debug_logs[k]:
@@ -186,30 +212,39 @@ def plot_distribution(xs, ys, ylabel, weight=0.6, plot_mean=True):
             # plt.savefig(f"./figures/{game_name}_{label}")
             plt.show()
 
-def plot_all(xs, action, scalar):
+def plot_all(xs, value, action, scalar):
     weight = 0.8
     for i, label in enumerate(wanted1 + wanted2):
         if label not in xs.keys():
             continue
-        fig, axes = plt.subplots(len(scalar) + 1, 1, figsize=(10, 10))
+        fig, axes = plt.subplots(len(scalar) + 2, 1, figsize=(15, 20))
         fig.suptitle(f"{game_name}_{label}")
         min_len = min([len(x) for x in xs[label]])
         x = xs[label][0][:min_len]
+        for i, (value_name, value_data) in enumerate(value.items()):
+            if value_data != {}:
+                y, y_min, y_max = gen_ydata(value_data[label], min_len, weight)
+                axes[0].plot(x, y, color=COLORS[i], label=value_name)
+                axes[0].fill_between(x, y_min, y_max, color=COLORS[i], alpha=0.9)
+            axes[0].legend(loc='upper right', handlelength=5, borderpad=1.2, labelspacing=1.2, fontsize=8)
+            axes[0].set_ylabel('inital state value')
+            axes[0].set_xlim([min(x)-10, max(x)+10])
+            axes[0].grid()
         for i, (action_name, action_data) in enumerate(action.items()):
             if action_data != {}:
                 y, y_min, y_max = gen_ydata(action_data[label], min_len, weight)
-                axes[0].plot(x, y, color=COLORS[i], label=action_name)
-                axes[0].fill_between(x, y_min, y_max, color=COLORS[i], alpha=0.9)
-                axes[0].legend(loc='upper left', handlelength=5, borderpad=1.2, labelspacing=1.2)
-                axes[0].set_ylabel('action probability')
-            axes[0].set_xlim([min(x)-10, max(x)+10])
-            axes[0].grid()
-        for i, (ax, (ylabel, ys)) in enumerate(zip(axes[1:], scalar.items())):
+                axes[1].plot(x, y, color=COLORS[i+3], label=action_name)
+                axes[1].fill_between(x, y_min, y_max, color=COLORS[i+3], alpha=0.9)
+            axes[1].legend(loc='upper left', handlelength=5, borderpad=1.2, labelspacing=1.2)
+            axes[1].set_ylabel('action probability')
+            axes[1].set_xlim([min(x)-10, max(x)+10])
+            axes[1].grid()
+        for i, (ax, (ylabel, ys)) in enumerate(zip(axes[2:], scalar.items())):
             y, y_min, y_max = gen_ydata(ys[label], min_len, weight)
             start = len(x) - len(y) if "loss" in ylabel else 0
             x_ = x[start:]
-            ax.plot(x_, y, color=COLORS[i+2])
-            ax.fill_between(x_, y_min, y_max, color=COLORS[i+2], alpha=0.9)
+            ax.plot(x_, y, color=COLORS[i+3+action_num])
+            ax.fill_between(x_, y_min, y_max, color=COLORS[i+3+action_num], alpha=0.9)
             ax.set_xlim([min(x)-10, max(x)+10])
             ax.set_ylabel(ylabel)
             ax.grid()
@@ -219,13 +254,11 @@ def plot_all(xs, action, scalar):
         plt.savefig(f"./figures/{time_tag}_{game_name}_{label}")
         plt.show()
 
-
 # COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
-COLORS = ['green', 'red','blue', 'orange', 'darkred', 'darkblue', 'black', 'yellow', 'magenta', 'cyan', 'purple', 'pink',
-          'brown', 'orange', 'teal', 'lightblue', 'lime', 'lavender', 'turquoise',
-          'green', 'tan', 'salmon', 'gold']
+COLORS = ['darkgreen', 'darkred', 'lightblue', 'green', 'red','blue', 'orange', 'darkred', 'darkblue', 'black', 'yellow', 'magenta', 'cyan', 'purple', 'pink',
+          'brown', 'orange', 'teal', 'lightblue', 'lime', 'lavender', 'tan']
 
-for suffix in ["value", "reward", "state"]:
+for suffix in ["p_value", "p_reward", "p_state", "np_value", "np_reward", "np_state"]:
     wanted1 = ['muzero', f'muzero_{suffix}+hyper']
     wanted2 = [f'muzero_{suffix}+hyper', f'muzero_{suffix}+hyper+prior', f'muzero_{suffix}+hyper+normal', f'muzero_{suffix}+hyper+target', f'muzero_{suffix}+hyper+reg']
     wanted3 = [f'muzero_{suffix}+hyper+prior', f'muzero_{suffix}+hyper+prior+normal', f'muzero_{suffix}+hyper+prior+target', f'muzero_{suffix}+hyper+prior+normal+target']
@@ -238,13 +271,12 @@ for suffix in ["value", "reward", "state"]:
     if "reward" in suffix: params_std = reward_params_std
     if "state" in suffix: params_std = state_params_std
 
-    scalars = {
-        "total reward": test_reward,
-        f"{suffix} variance": params_std,
-        "value loss": value_loss,
-        "reward loss": reward_loss,
-    }
-    plot_all(played_step, action_mean_datas, scalars)
+    scalars = {"total reward": test_reward, f"{suffix} variance": params_std}
+    if value_loss != {}:
+        scalars.update({"value loss": value_loss})
+    if reward_loss != {}:
+        scalars.update({"reward loss": reward_loss})
+    plot_all(played_step, value_mean_datas, action_mean_datas, scalars)
 
     # plot_scalar(played_step, test_reward, 'total reward', 0.9)
     # plot_scalar(played_step, params_std, f"{suffix} variance", 0.6)
