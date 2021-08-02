@@ -212,12 +212,12 @@ def plot_distribution(xs, ys, ylabel, weight=0.6, plot_mean=True):
             # plt.savefig(f"./figures/{game_name}_{label}")
             plt.show()
 
-def plot_all(xs, value, action, scalar):
+def plot_all(wanted, xs, value, action, scalar):
     weight = 0.8
-    for i, label in enumerate(wanted1 + wanted2):
+    for i, label in enumerate(wanted):
         if label not in xs.keys():
             continue
-        fig, axes = plt.subplots(len(scalar) + 2, 1, figsize=(15, 20))
+        fig, axes = plt.subplots(len(scalar) + 2, 1, figsize=(20, 30))
         fig.suptitle(f"{game_name}_{label}")
         min_len = min([len(x) for x in xs[label]])
         x = xs[label][0][:min_len]
@@ -225,7 +225,7 @@ def plot_all(xs, value, action, scalar):
             if value_data != {}:
                 y, y_min, y_max = gen_ydata(value_data[label], min_len, weight)
                 axes[0].plot(x, y, color=COLORS[i], label=value_name)
-                axes[0].fill_between(x, y_min, y_max, color=COLORS[i], alpha=0.9)
+                axes[0].fill_between(x, y_min, y_max, color=COLORS[i], alpha=0.2)
             axes[0].legend(loc='upper right', handlelength=5, borderpad=1.2, labelspacing=1.2, fontsize=8)
             axes[0].set_ylabel('inital state value')
             axes[0].set_xlim([min(x)-10, max(x)+10])
@@ -234,7 +234,7 @@ def plot_all(xs, value, action, scalar):
             if action_data != {}:
                 y, y_min, y_max = gen_ydata(action_data[label], min_len, weight)
                 axes[1].plot(x, y, color=COLORS[i+3], label=action_name)
-                axes[1].fill_between(x, y_min, y_max, color=COLORS[i+3], alpha=0.9)
+                axes[1].fill_between(x, y_min, y_max, color=COLORS[i+3], alpha=0.2)
             axes[1].legend(loc='upper left', handlelength=5, borderpad=1.2, labelspacing=1.2)
             axes[1].set_ylabel('action probability')
             axes[1].set_xlim([min(x)-10, max(x)+10])
@@ -244,7 +244,7 @@ def plot_all(xs, value, action, scalar):
             start = len(x) - len(y) if "loss" in ylabel else 0
             x_ = x[start:]
             ax.plot(x_, y, color=COLORS[i+3+action_num])
-            ax.fill_between(x_, y_min, y_max, color=COLORS[i+3+action_num], alpha=0.9)
+            ax.fill_between(x_, y_min, y_max, color=COLORS[i+3+action_num], alpha=0.2)
             ax.set_xlim([min(x)-10, max(x)+10])
             ax.set_ylabel(ylabel)
             ax.grid()
@@ -258,8 +258,15 @@ def plot_all(xs, value, action, scalar):
 COLORS = ['darkgreen', 'darkred', 'lightblue', 'green', 'red','blue', 'orange', 'darkred', 'darkblue', 'black', 'yellow', 'magenta', 'cyan', 'purple', 'pink',
           'brown', 'orange', 'teal', 'lightblue', 'lime', 'lavender', 'tan']
 
+wanted1 = ['muzero_p', 'muzero_np']
+scalars = {"total reward": test_reward}
+if value_loss != {}:
+    scalars.update({"value loss": value_loss})
+if reward_loss != {}:
+    scalars.update({"reward loss": reward_loss})
+plot_all(wanted1, played_step, value_mean_datas, action_mean_datas, scalars)
+
 for suffix in ["p_value", "p_reward", "p_state", "np_value", "np_reward", "np_state"]:
-    wanted1 = ['muzero_p', 'muzero_np']
     wanted2 = [f'muzero_{suffix}+hyper', f'muzero_{suffix}+hyper+prior', f'muzero_{suffix}+hyper+normal', f'muzero_{suffix}+hyper+target', f'muzero_{suffix}+hyper+reg']
     wanted3 = [f'muzero_{suffix}+hyper+prior', f'muzero_{suffix}+hyper+prior+normal', f'muzero_{suffix}+hyper+prior+target', f'muzero_{suffix}+hyper+prior+normal+target']
     wanted4 = [f'muzero_{suffix}+hyper+normal', f'muzero_{suffix}+hyper+prior+normal', f'muzero_{suffix}+hyper+normal+target', f'muzero_{suffix}+hyper+prior+normal+target']
@@ -276,7 +283,7 @@ for suffix in ["p_value", "p_reward", "p_state", "np_value", "np_reward", "np_st
         scalars.update({"value loss": value_loss})
     if reward_loss != {}:
         scalars.update({"reward loss": reward_loss})
-    plot_all(played_step, value_mean_datas, action_mean_datas, scalars)
+    plot_all(wanted2, played_step, value_mean_datas, action_mean_datas, scalars)
 
     # plot_scalar(played_step, test_reward, 'total reward', 0.9)
     # plot_scalar(played_step, params_std, f"{suffix} variance", 0.6)
