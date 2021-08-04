@@ -47,7 +47,6 @@ class MuZero:
             "lr": 0,
             "terminate": False,
         }
-        # self.replay_buffer = {}
         cpu_actor = CPUActor(self.config)
         weights, summary, self.model, self.target_model, self.optimizer = cpu_actor.initial_model_and_optimizer()
         self.checkpoint["weights"] = copy.deepcopy(weights)

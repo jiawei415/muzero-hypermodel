@@ -207,7 +207,6 @@ class RecordPlay:
 
     def start_record(self):
         done = False
-        step = 0
         noise_z = numpy.random.normal(0, 1, [1, self.noise_dim]) * self.config.normal_noise_std
         observation = self.game.reset()
         game_history = GameHistory()
@@ -233,8 +232,6 @@ class RecordPlay:
                 action = self.select_action(root, temperature=0)
                 observation, reward, done = self.game.step(action)
                 game_history.action_history.append(action)
-                step += 1
-        print(step)
 
     @staticmethod
     def select_action(node, temperature):
