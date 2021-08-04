@@ -67,9 +67,10 @@ class MuZero:
                 if k not in self.config.__dict__.keys():
                     print(f'unrecognized config k: {k}, v: {v}, ignored')
                 self.config.__dict__[k] = v
-            if self.config.use_priormodel: self.config.priormodel = self.config.hypermodel
-            if self.config.use_normalization: self.config.normalization = self.config.hypermodel
-            if self.config.use_target_noise: self.config.target_noise = self.config.hypermodel
+            if self.config.use_priormodel: self.config.priormodel = copy.deepcopy(self.config.hypermodel)
+            if self.config.use_normalization: self.config.normalization = copy.deepcopy(self.config.hypermodel)
+            if self.config.use_target_noise: self.config.target_noise = copy.deepcopy(self.config.hypermodel)
+            if self.config.use_value_target_noise: self.config.target_noise[0] = 1
         log_path = f"results/{game_name}_{self.config.seed}"
         # [v, r, s] = self.config.hypermodel
         # if v == 1: log_path += '_v'
