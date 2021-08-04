@@ -3,6 +3,7 @@ import math
 import numpy as np
 from gym import spaces
 from gym.utils import seeding
+from gym.wrappers import Monitor
 from .basicconfig import BasicConfig
 from .abstract_game import AbstractGame
 
@@ -19,13 +20,14 @@ class Game(AbstractGame):
     Game wrapper.
     """
 
-    def __init__(self, seed=None):
-        if MuZeroConfig().use_custom_env:
+    def __init__(self, config):
+        if config.use_custom_env:
             self.env = MountainCar()
         else:
             self.env = gym.make("MountainCar-v0")
-        if seed is not None:
-            self.env.seed(seed)
+        # self.env = Monitor(self.env, f'./videos', force=True)
+        if config.seed is not None:
+            self.env.seed(config.seed)
 
     def step(self, action):
         """

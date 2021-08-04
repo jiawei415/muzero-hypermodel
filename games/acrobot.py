@@ -19,13 +19,13 @@ class Game(AbstractGame):
     Game wrapper.
     """
 
-    def __init__(self, seed=None):
-        if MuZeroConfig().use_custom_env:   
-            self.env = Acrobot()
+    def __init__(self, config):
+        if config.use_custom_env:
+            self.env = Acrobot(config)
         else:
             self.env = gym.make("Acrobot-v1")
-        if seed is not None:
-            self.env.seed(seed)
+        if config.seed is not None:
+            self.env.seed(config.seed)
 
     def step(self, action):
         """
@@ -163,7 +163,8 @@ class Acrobot(core.Env):
     domain_fig = None
     actions_num = 3
 
-    def __init__(self):
+    def __init__(self, config):
+        self.config = config
         self.viewer = None
         high = np.array([1.0, 1.0, 1.0, 1.0, self.MAX_VEL_1, self.MAX_VEL_2], dtype=np.float32)
         low = -high
@@ -177,7 +178,7 @@ class Acrobot(core.Env):
         return [seed]
 
     def reset(self):
-        if MuZeroConfig().fix_init_state:
+        if self.config.fix_init_state:
             self.state = np.zeros((4,))
         else:
             self.state = self.np_random.uniform(low=-0.1, high=0.1, size=(4,))
@@ -212,7 +213,7 @@ class Acrobot(core.Env):
         terminal = self._terminal()
         reward = -1. if not terminal else 0.
         
-        if MuZeroConfig().use_reward_wrapper:
+        if self.config.use_reward_wrapper:
             reward = self._reward_wrapper(reward)
 
         return (self._get_ob(), reward, terminal, {})

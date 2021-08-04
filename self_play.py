@@ -8,7 +8,7 @@ class SelfPlay:
         self.config = config
         game_module = importlib.import_module("games." + self.config.game_filename)
         Game = game_module.Game
-        self.game = Game(self.config.seed)
+        self.game = Game(config)
 
         # Fix random generator seed
         numpy.random.seed(self.config.seed)
@@ -113,7 +113,7 @@ class TestPlay:
         self.config = config
         game_module = importlib.import_module("games." + self.config.game_filename)
         Game = game_module.Game
-        self.game = Game(self.config.seed)
+        self.game = Game(config)
         self.model = model
         self.noise_dim = int(self.config.hyper_inp_dim)
         self.fix_noise = torch.normal(0, 1, [1, self.noise_dim]) * self.config.normal_noise_std  

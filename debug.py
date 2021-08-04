@@ -10,7 +10,7 @@ class Debug:
         self.config = config
         game_module = importlib.import_module("games." + self.config.game_filename)
         Game = game_module.Game
-        self.game = Game(self.config.seed)
+        self.game = Game(config)
         self.model = model
         self.target_model = target_model
         self.writer = writer

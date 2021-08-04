@@ -16,10 +16,10 @@ class Game(AbstractGame):
     Game wrapper.
     """
 
-    def __init__(self, seed=None):
+    def __init__(self, config):
         self.env = gym.make("CartPole-v1")
-        if seed is not None:
-            self.env.seed(seed)
+        if config.seed is not None:
+            self.env.seed(config.seed)
 
     def step(self, action):
         """

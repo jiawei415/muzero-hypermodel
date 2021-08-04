@@ -22,10 +22,10 @@ class Game(AbstractGame):
     Game wrapper.
     """
 
-    def __init__(self, seed=None):
-        self.env = DeepSeaEnv(MuZeroConfig().size)
-        if seed is not None:
-            self.env.seed(seed)
+    def __init__(self, config):
+        self.env = DeepSeaEnv(config.size)
+        if config.seed is not None:
+            self.env.seed(config.seed)
 
     def step(self, action):
         """

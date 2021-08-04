@@ -68,7 +68,7 @@ def gen_ydata(ys, min_len, weight):
 
 game_name = "deepsea"
 action_num = 2
-time_tag = "20210801"
+time_tag = "20210802"
 log_path = f"./results/{game_name}/{time_tag}"
 labels = {"+hyper": "hypermodel", "+prior": "priormodel", "+normal": "normalization", "+target": "target_noise", "+reg": "use_reg_loss"}
 

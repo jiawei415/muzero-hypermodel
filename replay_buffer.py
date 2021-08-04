@@ -344,7 +344,7 @@ class Reanalyse:
         torch.manual_seed(self.config.seed)
         # Import the game class to enable MCTS updates
         game_module = importlib.import_module("games." + self.config.game_filename)
-        self.game = game_module.Game()
+        self.game = game_module.Game(config)
         self.game.env = None
         self.target_model = target_model
         self.target_model.eval()
