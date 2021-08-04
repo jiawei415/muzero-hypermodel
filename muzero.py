@@ -60,6 +60,7 @@ class MuZero:
         self.shared_storage_worker = None
         self.test_worker = None
         self.debug_worker = None
+        self.record_worker = None
 
     def init_config(self, game_name, config):
         if config is not None:
@@ -80,39 +81,39 @@ class MuZero:
         self.config.game_filename = game_name
         self.config.results_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"{log_path}_{time.strftime('%Y%m%d%H%M%S', time.localtime())}")
 
-    def init_workers(self, log_in_tensorboard=True):
-        if log_in_tensorboard or self.config.save_model:
-            os.makedirs(self.config.results_path, exist_ok=True)
-            config_logs_path = self.config.results_path + "/config_logs.csv"
-            hp_table = []
-            config_logs = pd.DataFrame(columns=["key", "value"])
-            for i, (key, value) in enumerate(self.config.__dict__.items()):
-                hp_table.extend([f"| {key} | {value} |"])
-                config_logs.loc[i] = [key, value]
-            config_logs.to_csv(config_logs_path, sep="\t", index=False)
-            print("\nTraining...\nRun tensorboard --logdir ./results and go to http://localhost:6006/ to see in real time the training performance.\n")
-            self.writer = SummaryWriter(self.config.results_path)
-            self.writer.add_text("Hyperparameters", "| Parameter | Value |\n|-------|-------|\n" + "\n".join(hp_table),)
-            self.writer.add_text("Model summary", self.summary,)
-            self.keys = [
-                "train_total_reward",
-                "train_mean_value",
-                "train_episode_length",
-                "test_total_reward",
-                "test_mean_value",
-                "test_episode_length",
-                "played_games",
-                "played_steps",
-                "training_steps",
-                "total_loss", 
-                "value_loss",
-                "reward_loss",
-                "policy_loss",
-                "lr"
-            ]
-            self.palyer_logs_path = self.config.results_path + "/palyer_logs.csv"
-            self.palyer_logs = pd.DataFrame(columns=self.keys)
-            self.palyer_logs.to_csv(self.palyer_logs_path, sep="\t", index=False)
+    def init_workers(self, record_video=False):
+        # Initialize tensorboard
+        os.makedirs(self.config.results_path, exist_ok=True)
+        config_logs_path = self.config.results_path + "/config_logs.csv"
+        hp_table = []
+        config_logs = pd.DataFrame(columns=["key", "value"])
+        for i, (key, value) in enumerate(self.config.__dict__.items()):
+            hp_table.extend([f"| {key} | {value} |"])
+            config_logs.loc[i] = [key, value]
+        config_logs.to_csv(config_logs_path, sep="\t", index=False)
+        print("\nTraining...\nRun tensorboard --logdir ./results and go to http://localhost:6006/ to see in real time the training performance.\n")
+        self.writer = SummaryWriter(self.config.results_path)
+        self.writer.add_text("Hyperparameters", "| Parameter | Value |\n|-------|-------|\n" + "\n".join(hp_table),)
+        self.writer.add_text("Model summary", self.summary,)
+        self.keys = [
+            "train_total_reward",
+            "train_mean_value",
+            "train_episode_length",
+            "test_total_reward",
+            "test_mean_value",
+            "test_episode_length",
+            "played_games",
+            "played_steps",
+            "training_steps",
+            "total_loss",
+            "value_loss",
+            "reward_loss",
+            "policy_loss",
+            "lr"
+        ]
+        self.palyer_logs_path = self.config.results_path + "/palyer_logs.csv"
+        self.palyer_logs = pd.DataFrame(columns=self.keys)
+        self.palyer_logs.to_csv(self.palyer_logs_path, sep="\t", index=False)
 
         # Initialize workers
         self.shared_storage_worker = shared_storage.SharedStorage(self.checkpoint, self.config)
@@ -124,9 +125,11 @@ class MuZero:
         self.self_play_worker = self_play.SelfPlay(self.model, self.config)
         self.test_worker = self_play.TestPlay(self.model, self.config)
         self.debug_worker = debug.Debug(self.model, self.target_model, self.config, self.writer)
+        if record_video:
+            self.record_worker = self_play.RecordPlay(self.model, self.config)
 
-    def train(self, log_in_tensorboard=True):
-        self.init_workers(log_in_tensorboard=log_in_tensorboard)
+    def train(self, record_video=False):
+        self.init_workers(record_video=record_video)
         self.start_train = False
         played_games = 0
         played_steps = 0
@@ -180,6 +183,8 @@ class MuZero:
             self.test()
             self.debug()
             self.run_log(episode)
+            if record_video:
+                self.record_worker.start_record()
     
         self.terminate_workers()
 
@@ -293,6 +298,7 @@ class MuZero:
         self.shared_storage_worker = None
         self.test_worker = None
         self.debug_worker = None
+        self.record_worker = None
 
 
 class CPUActor:
@@ -359,6 +365,7 @@ def get_args():
                         help='game name')
     parser.add_argument('--config', type=str, default="none",
                         help='game config')
+    parser.add_argument('--record-video', default=False, action='store_true')
     args = parser.parse_args()
     return args
 
@@ -369,5 +376,5 @@ if __name__ == "__main__":
     config = eval(args.config) if args.config != "none" else None
     glog.info(f"this is game: {game}")
     muzero = MuZero(game, config)
-    muzero.train()
+    muzero.train(args.record_video)
     

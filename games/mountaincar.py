@@ -3,7 +3,7 @@ import math
 import numpy as np
 from gym import spaces
 from gym.utils import seeding
-from gym.wrappers import Monitor
+from gym.wrappers import TimeLimit, Monitor
 from .basicconfig import BasicConfig
 from .abstract_game import AbstractGame
 
@@ -20,14 +20,18 @@ class Game(AbstractGame):
     Game wrapper.
     """
 
-    def __init__(self, config):
+    def __init__(self, config, record_video=False):
         if config.use_custom_env:
             self.env = MountainCar(config)
         else:
             self.env = gym.make("MountainCar-v0")
-        # self.env = Monitor(self.env, f'./videos', force=True)
         if config.seed is not None:
             self.env.seed(config.seed)
+        if record_video:
+            record_frequency = config.record_frequency
+            video_callable = lambda episode: episode % record_frequency == 0
+            self.env = TimeLimit(self.env, max_episode_steps=200)
+            self.env = Monitor(self.env, f'{config.results_path}/videos', video_callable=video_callable, force=True)
 
     def step(self, action):
         """

@@ -19,29 +19,6 @@ class Trainer:
         self.optimizer = optimizer
         self.writer = writer
         
-        # keys = ["total_loss", "value_loss", "reward_loss", "policy_loss", "lr",]
-        # self.trainer_logs_path = self.config.results_path + "/trainer_logs.csv"
-        # self.trainer_logs = pd.DataFrame(columns=keys)
-        # self.trainer_logs.to_csv(self.trainer_logs_path, sep="\t", index=False)
-
-    def trainer_log(self, losses, counter):
-        lr = self.optimizer.param_groups[0]["lr"]
-        trainer_log = [
-            losses["total_loss"],
-            losses["value_loss"],
-            losses["reward_loss"],
-            losses["policy_loss"],
-            lr,
-        ]
-        self.trainer_logs.loc[counter] = trainer_log
-        self.trainer_logs.to_csv(self.trainer_logs_path, sep="\t", index=False)
-
-        self.writer.add_scalar("4.Trainer/1.Total_loss", losses["total_loss"], counter)
-        self.writer.add_scalar("4.Trainer/2.Value_loss", losses["value_loss"], counter)
-        self.writer.add_scalar("4.Trainer/3.Reward_loss", losses["reward_loss"], counter)
-        self.writer.add_scalar("4.Trainer/4.Policy_loss", losses["policy_loss"], counter)
-        self.writer.add_scalar("4.Trainer/5.Learning_rate", lr, counter)
-        
     def train_game(self, batch, training_step):
         if training_step % self.config.target_update_freq == 0:
             # print(f"update target model")
@@ -49,9 +26,6 @@ class Trainer:
         self.model.train()
         self.update_lr(training_step)
         priorities, losses = self.update_weights(batch)  
-        
-        # if training_step % self.config.checkpoint_interval == 0:
-        #     self.trainer_log(losses, training_step)
         return priorities, losses
 
     def update_weights(self, batch):

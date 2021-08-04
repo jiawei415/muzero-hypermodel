@@ -19,7 +19,7 @@ class Game(AbstractGame):
     Game wrapper.
     """
 
-    def __init__(self, config):
+    def __init__(self, config, record_video=False):
         if config.use_custom_env:
             self.env = Acrobot(config)
         else:

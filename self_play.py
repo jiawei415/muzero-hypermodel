@@ -194,3 +194,69 @@ class TestPlay:
             action = numpy.random.choice(actions, p=visit_count_distribution)
 
         return action
+
+
+class RecordPlay:
+    def __init__(self, model, config):
+        self.config = config
+        game_module = importlib.import_module("games." + self.config.game_filename)
+        Game = game_module.Game
+        self.game = Game(config, record_video=True)
+        self.model = model
+        self.noise_dim = int(self.config.hyper_inp_dim)
+
+    def start_record(self):
+        done = False
+        step = 0
+        noise_z = numpy.random.normal(0, 1, [1, self.noise_dim]) * self.config.normal_noise_std
+        observation = self.game.reset()
+        game_history = GameHistory()
+        game_history.action_history.append(0)
+        game_history.observation_history.append(observation)
+        self.model.eval()
+        while not done:
+            with torch.no_grad():
+                stacked_observations = game_history.get_stacked_observations(
+                    -1,
+                    self.config.stacked_observations,
+                )
+                # Choose the action
+                root, mcts_info = MCTS(self.config).run(
+                    noise_z,
+                    self.config.num_simulations,
+                    self.model,
+                    stacked_observations,
+                    self.game.legal_actions(),
+                    self.game.to_play(),
+                    True,
+                )
+                action = self.select_action(root, temperature=0)
+                observation, reward, done = self.game.step(action)
+                game_history.action_history.append(action)
+                step += 1
+        print(step)
+
+    @staticmethod
+    def select_action(node, temperature):
+        """
+        Select action according to the visit count distribution and the temperature.
+        The temperature is changed dynamically with the visit_softmax_temperature function
+        in the config.
+        """
+        visit_counts = numpy.array(
+            [child.visit_count for child in node.children.values()], dtype="int32"
+        )
+        actions = [action for action in node.children.keys()]
+        if temperature == 0:
+            action = actions[numpy.argmax(visit_counts)]
+        elif temperature == float("inf"):
+            action = numpy.random.choice(actions)
+        else:
+            # See paper appendix Data Generation
+            visit_count_distribution = visit_counts ** (1 / temperature)
+            visit_count_distribution = visit_count_distribution / sum(
+                visit_count_distribution
+            )
+            action = numpy.random.choice(actions, p=visit_count_distribution)
+
+        return action

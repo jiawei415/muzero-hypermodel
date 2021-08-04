@@ -21,8 +21,7 @@ class Game(AbstractGame):
     """
     Game wrapper.
     """
-
-    def __init__(self, config):
+    def __init__(self, config, record_video=False):
         self.env = DeepSeaEnv(config)
         if config.seed is not None:
             self.env.seed(config.seed)
