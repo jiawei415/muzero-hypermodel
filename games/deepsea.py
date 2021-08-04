@@ -23,7 +23,7 @@ class Game(AbstractGame):
     """
 
     def __init__(self, config):
-        self.env = DeepSeaEnv(config.size)
+        self.env = DeepSeaEnv(config)
         if config.seed is not None:
             self.env.seed(config.seed)
 
@@ -103,10 +103,10 @@ class DeepSeaEnv(gym.Env):
     [1] https://arxiv.org/abs/1703.07608
     [2] https://arxiv.org/abs/1806.03335
     """
-    def __init__(self, size, deterministic=True, unscaled_move_cost=0.01):
+    def __init__(self, config, deterministic=True, unscaled_move_cost=0.01):
         super().__init__()
-
-        self._size = size
+        self.config = config
+        self._size = config.size
         self._deterministic = deterministic # config.get("deterministic", True)
         self.observation_space = spaces.Box(low=0, high=1, shape=(self._size, self._size), dtype=np.int32)
         self.action_space = spaces.Discrete(n=2)
@@ -138,7 +138,7 @@ class DeepSeaEnv(gym.Env):
         return obs
 
     def step(self, action: int):
-        reward = 0. if MuZeroConfig().use_reward_wrapper else -1.
+        reward = 0. if self.config.use_reward_wrapper else -1.
         action_right = action == 1 # self._action_mapping[self._row, self._column]
 
         # Reward calculation

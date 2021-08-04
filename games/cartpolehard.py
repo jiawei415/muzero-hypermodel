@@ -21,7 +21,7 @@ class Game(AbstractGame):
     """
 
     def __init__(self, config):
-        self.env = CartPoleHard()
+        self.env = CartPoleHard(config)
         if config.seed is not None:
             self.env.seed(config.seed)
 
@@ -96,7 +96,8 @@ class CartPoleHard(gym.Env):
         'render.modes': ['human', 'rgb_array'],
         'video.frames_per_second': 50
     }
-    def __init__(self):
+    def __init__(self, config):
+        self.config = config
         self.gravity = 9.8
         self.masscart = 1.0
         self.masspole = 0.1
@@ -200,7 +201,7 @@ class CartPoleHard(gym.Env):
                 )
             self.steps_beyond_done += 1
             reward = -1.0
-        if MuZeroConfig().use_reward_wrapper:
+        if self.config.use_reward_wrapper:
             reward = self._reward_wrapper(reward)
         return np.array(self.state), reward, done, {}
     
@@ -215,7 +216,7 @@ class CartPoleHard(gym.Env):
         ###########################################################
         ''' Hard: '''
         theta_init = 45 * 2 * math.pi / 360
-        if MuZeroConfig().fix_init_state:
+        if self.config.fix_init_state:
             x, x_dot, theta, theta_dot = 0, 0, theta_init, 0
         else:
             x = np.random.uniform(-0.05, 0.05)
