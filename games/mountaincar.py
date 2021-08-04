@@ -22,7 +22,7 @@ class Game(AbstractGame):
 
     def __init__(self, config):
         if config.use_custom_env:
-            self.env = MountainCar()
+            self.env = MountainCar(config)
         else:
             self.env = gym.make("MountainCar-v0")
         # self.env = Monitor(self.env, f'./videos', force=True)
@@ -135,7 +135,8 @@ class MountainCar(gym.Env):
         'video.frames_per_second': 30
     }
 
-    def __init__(self, goal_velocity=0):
+    def __init__(self, config, goal_velocity=0):
+        self.config = config
         self.min_position = -1.2
         self.max_position = 0.6
         self.max_speed = 0.07
@@ -181,7 +182,7 @@ class MountainCar(gym.Env):
         )
         reward = -1.0
 
-        if MuZeroConfig().use_reward_wrapper:
+        if self.config.use_reward_wrapper:
             reward = self._reward_wrapper(reward)
 
         self.state = (position, velocity)
@@ -191,7 +192,7 @@ class MountainCar(gym.Env):
         return 0 if reward == -1 else 1
 
     def reset(self):
-        if MuZeroConfig().fix_init_state:
+        if self.config.fix_init_state:
             self.state = np.array([-0.5, 0])
         else:
             self.state = np.array([self.np_random.uniform(low=-0.6, high=-0.4), 0])
