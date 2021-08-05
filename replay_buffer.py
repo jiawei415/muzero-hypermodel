@@ -294,12 +294,10 @@ class ReplayBuffer:
             value = self.compute_target_value(game_history, current_index) if current_index < game_history_len else 0
             reward = 0 if current_index > game_history_len else game_history.reward_history[current_index] 
             
-            if self.config.use_target_noise:
+            if self.use_value_noise or self.use_reward_noise:
                 target_noise = self.compute_target_noise(game_history, current_index)
-                if self.use_value_noise:
-                    value += target_noise
-                if self.use_reward_noise:
-                    reward += target_noise
+                if self.use_value_noise: value += target_noise
+                if self.use_reward_noise: reward += target_noise
             
             if current_index < game_history_len:
                 target_values.append(value)

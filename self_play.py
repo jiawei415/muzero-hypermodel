@@ -9,7 +9,7 @@ class SelfPlay:
         game_module = importlib.import_module("games." + self.config.game_filename)
         Game = game_module.Game
         self.game = Game(config)
-
+        self.use_value_noise, self.use_reward_noise, _ = config.target_noise
         # Fix random generator seed
         numpy.random.seed(self.config.seed)
         torch.manual_seed(self.config.seed)
@@ -32,7 +32,7 @@ class SelfPlay:
         game_history.observation_history.append(observation)
         game_history.reward_history.append(0)
         game_history.to_play_history.append(self.game.to_play())
-        if self.config.use_target_noise:
+        if self.use_value_noise or self.use_reward_noise:
             game_history.unit_sphere_history.append(self.sample_unit_sphere())
 
         return game_history
@@ -69,7 +69,7 @@ class SelfPlay:
             game_history.observation_history.append(observation)
             game_history.reward_history.append(reward)
             game_history.to_play_history.append(self.game.to_play())
-            if self.config.use_target_noise:
+            if self.use_value_noise or self.use_reward_noise:
                 game_history.unit_sphere_history.append(self.sample_unit_sphere())
 
             return done
