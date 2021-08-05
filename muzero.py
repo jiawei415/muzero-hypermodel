@@ -9,6 +9,7 @@ import argparse
 import warnings
 import importlib
 import pandas as pd
+from torch._C import device
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 import models
@@ -47,8 +48,8 @@ class MuZero:
             "lr": 0,
             "terminate": False,
         }
-        cpu_actor = CPUActor(self.config)
-        weights, summary, self.model, self.target_model, self.optimizer = cpu_actor.initial_model_and_optimizer()
+        actor = Actor(self.config)
+        weights, summary, self.model, self.target_model, self.optimizer = actor.initial_model_and_optimizer()
         self.checkpoint["weights"] = copy.deepcopy(weights)
         self.summary = copy.deepcopy(summary)
         # Workers
@@ -300,15 +301,14 @@ class MuZero:
         self.record_worker = None
 
 
-class CPUActor:
-    # Trick to force DataParallel to stay on CPU to get weights on CPU even if there is a GPU
+class Actor:
     def __init__(self, config):
         self.config = config
 
     def initial_model_and_optimizer(self):
-        model = models.MuZeroNetwork(self.config)
-        model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
-        target_model = models.MuZeroNetwork(self.config)
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        model = models.MuZeroNetwork(self.config).to(device)
+        target_model = models.MuZeroNetwork(self.config).to(device)
         target_model.load_state_dict(model.state_dict())
         value_normal, reward_normal, state_normal = self.config.normalization
         if value_normal:

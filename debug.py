@@ -51,19 +51,17 @@ class Debug:
                     True,
                 )
                 self.value_log['mcts_value'].append(root.value())
-                debug_observations = (
-                    torch.tensor(stacked_observations)
-                    .float()
-                    .unsqueeze(0)
-                    .to(next(self.model.parameters()).device)
-                )
+                debug_observations = torch.tensor(stacked_observations).float().unsqueeze(0)
+                noise_z = torch.tensor(noise_z).float()
                 target_model_value, _, _, _, _ = self.target_model.initial_inference(
-                        debug_observations, torch.tensor(noise_z, dtype=torch.float)
+                        debug_observations.to(next(self.target_model.parameters()).device),
+                        noise_z.to(next(self.target_model.parameters()).device)
                     )
                 target_model_value = support_to_scalar(target_model_value, self.config.support_size).item()
                 self.value_log['target_model_value'].append(target_model_value)
                 model_value, _, debug_logits, _, _ = self.model.initial_inference(
-                        debug_observations, torch.tensor(noise_z, dtype=torch.float)
+                        debug_observations.to(next(self.model.parameters()).device),
+                        noise_z.to(next(self.model.parameters()).device)
                     )
                 model_value = support_to_scalar(model_value, self.config.support_size).item()
                 self.value_log['model_value'].append(model_value)
@@ -71,7 +69,7 @@ class Debug:
                 for i in self.config.action_space:
                     self.actions_log[f"mcts_action_{i}"].append(root.children[i].prior)
                     self.actions_log[f"model_action_{i}"].append(debug_policy[i].item())
-                debug_params = self.model.debug(torch.tensor(noise_z, dtype=torch.float))
+                debug_params = self.model.debug(noise_z.to(next(self.model.parameters()).device))
                 for k, v in debug_params.items():
                     if "value" in k and v is not None:
                         value_params.append(v)

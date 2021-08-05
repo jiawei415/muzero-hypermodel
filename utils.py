@@ -42,13 +42,14 @@ class MCTS:
                 .unsqueeze(0)
                 .to(next(model.parameters()).device)
             )
+            noise_z = torch.tensor(noise_z).float().to(next(model.parameters()).device)
             (
                 root_predicted_value,
                 reward,
                 policy_logits,
                 hidden_state,
                 _,
-            ) = model.initial_inference(observation, torch.tensor(noise_z, dtype=torch.float))
+            ) = model.initial_inference(observation, noise_z)
             root_predicted_value = support_to_scalar(
                 root_predicted_value, self.config.support_size
             ).item()
@@ -99,7 +100,7 @@ class MCTS:
             value, reward, policy_logits, hidden_state, _, _, _ = model.recurrent_inference(
                 parent.hidden_state,
                 torch.tensor([[action]]).to(parent.hidden_state.device),
-                torch.tensor(noise_z, dtype=torch.float)
+                noise_z
             )
             value = support_to_scalar(value, self.config.support_size).item()
             reward = support_to_scalar(reward, self.config.support_size).item()

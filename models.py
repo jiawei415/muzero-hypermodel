@@ -71,7 +71,6 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
                     encoding_size,
                 )
             )
-            
         if self.state_hyper:
             print(f"use dynamics state hypermodel!")
             layers = [encoding_size + self.action_space_size] + fc_dynamics_layers + [encoding_size]
@@ -160,7 +159,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         policy_logits = self.prediction_policy_network(encoded_state)
         if self.value_hyper:
             value_params = self.value_params(noise_z)
-            value_prior_params = torch.mm(noise_z, self.value_prior_params)
+            value_prior_params = torch.mm(noise_z, self.value_prior_params.to(noise_z.device))
             value_params_ = value_params + value_prior_params if self.value_prior else value_params
             split_params = self.split_params(value_params_, "value")
             if self.value_normal:
@@ -185,7 +184,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
 
         if self.state_hyper:
             state_params = self.state_params(noise_z)
-            state_prior_params = torch.mm(noise_z, self.state_prior_params)
+            state_prior_params = torch.mm(noise_z, self.state_prior_params.to(noise_z.device))
             state_params_ = state_params + state_prior_params if self.state_prior else state_params
             split_params = self.split_params(state_params_, "state")
             if self.state_normal:
@@ -199,7 +198,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
 
         if self.reward_hyper:
             reward_params = self.reward_params(noise_z)
-            reward_prior_params = torch.mm(noise_z, self.reward_prior_params)
+            reward_prior_params = torch.mm(noise_z, self.reward_prior_params.to(noise_z.device))
             reward_params_ = reward_params + reward_prior_params if self.reward_prior else reward_params
             split_params = self.split_params(reward_params_, "reward")
             if self.reward_normal:
@@ -321,7 +320,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         return hypermodel_std
 
     def calculation_std(self, params):
-        std = torch.sum(torch.diag(torch.mm(params, params.t())))
+        std = torch.sum(torch.diag(torch.mm(params, params.t()))).cpu()
         return std.detach().numpy()
 
 

@@ -24,6 +24,8 @@ class ReplayBuffer:
         # Fix random generator seed
         numpy.random.seed(self.config.seed)
         self.counter = self.config.seed + 1
+        if torch.cuda.is_available():
+            multiprocessing.set_start_method('spawn')
 
     def save_game(self, game_history):
         if self.config.PER:
