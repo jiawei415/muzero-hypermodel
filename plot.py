@@ -68,7 +68,7 @@ def gen_ydata(ys, min_len, weight):
 
 game_name = "deepsea"
 action_num = 2
-time_tag = "20210802"
+time_tag = "20210805"
 log_path = f"./results/{game_name}/{time_tag}"
 labels = {"+hyper": "hypermodel", "+prior": "priormodel", "+normal": "normalization", "+target": "target_noise", "+reg": "use_reg_loss"}
 
@@ -266,15 +266,18 @@ if reward_loss != {}:
     scalars.update({"reward loss": reward_loss})
 plot_all(wanted1, played_step, value_mean_datas, action_mean_datas, scalars)
 
-for suffix in ["p_value", "p_reward", "p_state", "np_value", "np_reward", "np_state"]:
+# for suffix in ["p_value", "p_reward", "p_state", "np_value", "np_reward", "np_state"]:
+# for suffix in ["p_reward", "p_state", "np_reward", "np_state"]:
+for suffix in ["np_reward", "np_state", "np_reward_state"]:
     wanted2 = [f'muzero_{suffix}+hyper', f'muzero_{suffix}+hyper+prior', f'muzero_{suffix}+hyper+normal', f'muzero_{suffix}+hyper+target', f'muzero_{suffix}+hyper+reg']
     wanted3 = [f'muzero_{suffix}+hyper+prior', f'muzero_{suffix}+hyper+prior+normal', f'muzero_{suffix}+hyper+prior+target', f'muzero_{suffix}+hyper+prior+normal+target']
     wanted4 = [f'muzero_{suffix}+hyper+normal', f'muzero_{suffix}+hyper+prior+normal', f'muzero_{suffix}+hyper+normal+target', f'muzero_{suffix}+hyper+prior+normal+target']
     wanted5 = [f'muzero_{suffix}+hyper+target', f'muzero_{suffix}+hyper+prior+target', f'muzero_{suffix}+hyper+normal+target', f'muzero_{suffix}+hyper+prior+normal+target']
     wanted6 = [f'muzero_{suffix}+hyper', f'muzero_{suffix}+hyper+prior+normal+target+reg']
+    wanted7 = [f'muzero_{suffix}+hyper+prior', f'muzero_{suffix}+hyper+prior+target']
     wanteds = [wanted1, wanted2, wanted3, wanted4, wanted5]
 
-    if "value" in suffix: params_std = value_params_std
+    # if "value" in suffix: params_std = value_params_std
     if "reward" in suffix: params_std = reward_params_std
     if "state" in suffix: params_std = state_params_std
 
@@ -283,7 +286,7 @@ for suffix in ["p_value", "p_reward", "p_state", "np_value", "np_reward", "np_st
         scalars.update({"value loss": value_loss})
     if reward_loss != {}:
         scalars.update({"reward loss": reward_loss})
-    plot_all(wanted2, played_step, value_mean_datas, action_mean_datas, scalars)
+    plot_all(wanted7, played_step, value_mean_datas, action_mean_datas, scalars)
 
     # plot_scalar(played_step, test_reward, 'total reward', 0.9)
     # plot_scalar(played_step, params_std, f"{suffix} variance", 0.6)

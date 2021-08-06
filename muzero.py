@@ -118,7 +118,7 @@ class MuZero:
         # Initialize workers
         self.shared_storage_worker = shared_storage.SharedStorage(self.checkpoint, self.config)
         self.shared_storage_worker.set_info("terminate", False)
-        
+
         self.reanalyse_worker = replay_buffer.Reanalyse(self.target_model, self.config)
         self.replay_buffer_worker = replay_buffer.ReplayBuffer(self.reanalyse_worker, self.config)
         self.training_worker = trainer.Trainer(self.model, self.target_model, self.optimizer, self.config, self.writer)
@@ -146,7 +146,7 @@ class MuZero:
                 played_steps += 1
                 self.shared_storage_worker.set_info({"played_steps": played_steps})
                 if played_games >= self.config.start_train and played_steps % self.config.train_frequency == 0:
-                    self.start_train = True     
+                    self.start_train = True
                     train_times = self.config.train_per_paly(played_steps)
                     # for _ in tqdm(range(train_times)):
                     for _ in range(train_times):
@@ -165,9 +165,9 @@ class MuZero:
                         if self.config.PER:
                             self.replay_buffer_worker.update_priorities(priorities, index_batch)
                         training_steps += 1
-                        self.shared_storage_worker.set_info({"training_steps": training_steps})                        
+                        self.shared_storage_worker.set_info({"training_steps": training_steps})
             played_games += 1
-            self.shared_storage_worker.set_info({"played_games": played_games})         
+            self.shared_storage_worker.set_info({"played_games": played_games})
             self.self_play_worker.close_game()
             self.replay_buffer_worker.save_game(game_history)
             self.shared_storage_worker.set_info(
@@ -185,7 +185,7 @@ class MuZero:
             self.run_log(episode)
             if record_video:
                 self.record_worker.start_record()
-    
+
         self.terminate_workers()
 
     def test(self, model_path=None):
@@ -201,7 +201,7 @@ class MuZero:
             self.test_worker.close_game()
             total_reward += sum(game_history.reward_history)
             mean_value += numpy.mean(game_history.root_values)
-            episode_length += len(game_history.action_history) - 1      
+            episode_length += len(game_history.action_history) - 1
         self.shared_storage_worker.set_info(
             {
                 "test_total_reward": total_reward/self.config.test_times,
@@ -209,7 +209,7 @@ class MuZero:
                 "test_episode_length": episode_length/self.config.test_times,
             }
         )
-        
+
     def debug(self):
         counter = self.shared_storage_worker.get_info("played_steps")
         self.debug_worker.start_debug(counter)
@@ -249,7 +249,7 @@ class MuZero:
         self.writer.add_scalar("3.Workers/4.Training_steps_per_played_step_ratio",
             info["training_steps"] / max(1, info["played_steps"]), counter,
         )
-        
+
         if self.start_train:
             self.writer.add_scalar("4.Trainer/1.Total_loss", info["total_loss"], counter)
             self.writer.add_scalar("4.Trainer/2.Value_loss", info["value_loss"], counter)
@@ -368,7 +368,7 @@ def get_args():
     args = parser.parse_args()
     return args
 
-if __name__ == "__main__": 
+if __name__ == "__main__":
     warnings.filterwarnings('ignore')
     args = get_args()
     game = args.game
@@ -376,4 +376,4 @@ if __name__ == "__main__":
     glog.info(f"this is game: {game}")
     muzero = MuZero(game, config)
     muzero.train(args.record_video)
-    
+
