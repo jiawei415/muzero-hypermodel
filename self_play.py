@@ -118,14 +118,12 @@ class TestPlay:
         self.noise_dim = int(self.config.hyper_inp_dim)
         self.fix_noise = torch.normal(0, 1, [1, self.noise_dim]) * self.config.normal_noise_std  
         
-    def start_game(self, fix_noise=False, render=False):
+    def start_game(self, fix_noise=False):
         observation = self.game.reset()
         if fix_noise:
             noise_z = self.fix_noise
         else:
             noise_z = numpy.random.normal(0, 1, [1, self.noise_dim]) * self.config.normal_noise_std
-        if render:
-            self.game.render()
         game_history = GameHistory()
         game_history.noise_history = noise_z
         game_history.action_history.append(0)
@@ -135,7 +133,7 @@ class TestPlay:
 
         return game_history
 
-    def play_game(self, game_history, render=False):    
+    def play_game(self, game_history):
         self.model.eval()
         with torch.no_grad():
             stacked_observations = game_history.get_stacked_observations(
@@ -153,11 +151,6 @@ class TestPlay:
                 True,
             )
             action = self.select_action(root, temperature=0)
-            if render:
-                print(f'Tree depth: {mcts_info["max_tree_depth"]}')
-                print(f"Root value for player {self.game.to_play()}: {root.value():.2f}")
-                print(f"Played action: {self.game.action_to_string(action)}")
-                self.game.render()            
             observation, reward, done = self.game.step(action)
             game_history.store_search_statistics(root, self.config.action_space)
             # Next batch

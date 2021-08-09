@@ -55,6 +55,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         self.value_prior, self.reward_prior, self.state_prior = config.priormodel
         self.value_hyper, self.reward_hyper, self.state_hyper = config.hypermodel
         self.value_normal, self.reward_normal, self.state_normal = config.normalization
+        self.init_norm, self.target_norm = {}, {}
         self.config = config
 
         if not self.config.use_representation and self.config.stacked_observations == 0:
@@ -80,7 +81,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             self.state_params = torch.nn.Linear(state_params_inp_dim, state_params_out_dim)
             self.state_prior_params = self.gen_prior_params(state_params_inp_dim, state_params_out_dim)
             if self.state_normal:
-                self.init_state_norm, self.target_state_norm = [], []
+                self.init_norm['state'], self.target_norm['state'] = [], []
         else:
             self.dynamics_encoded_state_network = torch.nn.DataParallel(
                 mlp(
@@ -99,7 +100,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             self.reward_params = torch.nn.Linear(reward_params_inp_dim, reward_params_out_dim)
             self.reward_prior_params = self.gen_prior_params(reward_params_inp_dim, reward_params_out_dim)
             if self.reward_normal:
-                self.init_reward_norm, self.target_reward_norm = [], []
+                self.init_norm['reward'], self.target_norm['reward'] = [], []
         else:
             self.dynamics_reward_network = torch.nn.DataParallel(
                 mlp(encoding_size, fc_reward_layers, self.full_support_size)
@@ -118,7 +119,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             self.value_params = torch.nn.Linear(value_params_inp_dim, value_params_out_dim)
             self.value_prior_params = self.gen_prior_params(value_params_inp_dim, value_params_out_dim)
             if self.value_normal:
-                self.init_value_norm, self.target_value_norm = [], []
+                self.init_norm['value'], self.target_norm['value'] = [], []
         else:
             self.prediction_value_network = torch.nn.DataParallel(
                 mlp(encoding_size, fc_value_layers, self.full_support_size)
@@ -163,7 +164,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             value_params_ = value_params + value_prior_params if self.value_prior else value_params
             split_params = self.split_params(value_params_, "value")
             if self.value_normal:
-                if len(self.init_value_norm) == 0:
+                if len(self.init_norm['value']) == 0:
                     self.gen_norm(split_params, "value")
                 split_params = self.get_normal_params(split_params, "value")
             value = self.basemodel_forward(encoded_state, split_params)
@@ -188,7 +189,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             state_params_ = state_params + state_prior_params if self.state_prior else state_params
             split_params = self.split_params(state_params_, "state")
             if self.state_normal:
-                if len(self.init_state_norm) == 0:
+                if len(self.init_norm['state']) == 0:
                     self.gen_norm(split_params, "state")
                 split_params = self.get_normal_params(split_params, "state")
             next_encoded_state = self.basemodel_forward(x, split_params)
@@ -202,7 +203,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             reward_params_ = reward_params + reward_prior_params if self.reward_prior else reward_params
             split_params = self.split_params(reward_params_, "reward")
             if self.reward_normal:
-                if len(self.init_reward_norm) == 0:
+                if len(self.init_norm['reward']) == 0:
                     self.gen_norm(split_params, "reward")
                 split_params = self.get_normal_params(split_params, "reward")
             reward = self.basemodel_forward(next_encoded_state, split_params)
@@ -277,15 +278,8 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         return params_splited
 
     def get_normal_params(self, params, normal_type):
-        if normal_type == "reward":
-            init_norm = self.init_reward_norm
-            target_norm = self.target_reward_norm
-        elif normal_type == "state":
-            init_norm = self.init_state_norm
-            target_norm = self.target_state_norm
-        elif normal_type == "value":
-            init_norm = self.init_value_norm
-            target_norm = self.target_value_norm
+        init_norm = self.init_norm[normal_type]
+        target_norm = self.target_norm[normal_type]
         gain = 1.
         for i, param in enumerate(params):
             if param.shape[1] == 1:
@@ -294,27 +288,14 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         return params
 
     def gen_norm(self, params, norm_type):
-        self.init_norm, self.target_norm = {}, {}
         print(f"gen {norm_type} norm!")
+        init_norm, target_norm = [], []
         for param in params:
-            if norm_type == "reward":
-                self.init_reward_norm.append(torch.norm(param).detach().numpy())
-                self.target_reward_norm.append(torch.norm(torch.nn.init.xavier_normal_(
-                    torch.empty(size=param.size()))).detach().numpy())
-                self.init_norm['reward'] = self.init_reward_norm
-                self.target_norm['reward'] = self.target_reward_norm
-            elif norm_type == "state":
-                self.init_state_norm.append(torch.norm(param).detach().numpy())
-                self.target_state_norm.append(torch.norm(torch.nn.init.xavier_normal_(
-                    torch.empty(size=param.size()))).detach().numpy())
-                self.init_norm['state'] = self.init_state_norm
-                self.target_norm['state'] = self.target_state_norm
-            elif norm_type == "value":
-                self.init_value_norm.append(torch.norm(param).detach().numpy())
-                self.target_value_norm.append(torch.norm(torch.nn.init.xavier_normal_(
-                    torch.empty(size=param.size()))).detach().numpy())
-                self.init_norm['value'] = self.init_value_norm
-                self.target_norm['value'] = self.target_value_norm
+            init_norm.append(torch.norm(param).detach().numpy())
+            target_norm.append(torch.norm(torch.nn.init.xavier_normal_(
+                torch.empty(size=param.size()))).detach().numpy())
+        self.init_norm[norm_type] = init_norm
+        self.target_norm[norm_type] = target_norm
 
     def get_hypermodel(self,):
         hypermodel_std = dict()

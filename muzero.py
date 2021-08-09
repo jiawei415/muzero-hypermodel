@@ -186,7 +186,7 @@ class MuZero:
             done = False
             game_history = self.test_worker.start_game()
             while not done and len(game_history.action_history) <= self.config.max_moves:
-                done = self.test_worker.play_game(game_history, render=False)
+                done = self.test_worker.play_game(game_history)
             self.test_worker.close_game()
             total_reward += sum(game_history.reward_history)
             mean_value += numpy.mean(game_history.root_values)
@@ -321,16 +321,8 @@ class Actor:
         weigths = model.get_weights()
         summary = str(model).replace("\n", " \n\n")
         target_model.set_weights(weigths)
-        value_normal, reward_normal, state_normal = self.config.normalization
-        if value_normal:
-            target_model.init_value_norm = model.init_value_norm
-            target_model.target_value_norm = model.target_value_norm
-        if reward_normal:
-            target_model.init_reward_norm = model.init_reward_norm
-            target_model.target_reward_norm = model.target_reward_norm
-        if state_normal:
-            target_model.init_state_norm = model.init_state_norm
-            target_model.target_state_norm = model.target_state_norm
+        target_model.init_norm = model.init_norm
+        target_model.target_norm = model.target_norm
         optimizer = self.initial_optimizer(model)
         if "cuda" not in str(next(model.parameters()).device):
             print("You are not training on GPU.\n")
@@ -367,7 +359,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--game', type=str, default="mountaincar",
                         help='game name')
-    parser.add_argument('--config', type=str, default="",
+    parser.add_argument('--config', type=str, default="none",
                         help='game config')
     parser.add_argument('--ckpt-path', type=str, default="",
                         help='game config')
