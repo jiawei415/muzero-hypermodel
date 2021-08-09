@@ -9,7 +9,6 @@ import argparse
 import warnings
 import importlib
 import pandas as pd
-from torch._C import device
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 import models
@@ -81,7 +80,7 @@ class MuZero:
         self.config.game_filename = game_name
         self.config.results_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"{log_path}_{time.strftime('%Y%m%d%H%M%S', time.localtime())}")
 
-    def init_workers(self, record_video=False):
+    def init_workers(self):
         # Initialize tensorboard
         os.makedirs(self.config.results_path, exist_ok=True)
         config_logs_path = self.config.results_path + "/config_logs.csv"
@@ -125,11 +124,11 @@ class MuZero:
         self.self_play_worker = self_play.SelfPlay(self.model, self.config)
         self.test_worker = self_play.TestPlay(self.model, self.config)
         self.debug_worker = debug.Debug(self.model, self.target_model, self.config, self.writer)
-        if record_video:
+        if self.config.record_video:
             self.record_worker = self_play.RecordPlay(self.model, self.config)
 
-    def train(self, record_video=False):
-        self.init_workers(record_video=record_video)
+    def train(self):
+        self.init_workers()
         self.start_train = False
         played_games = 0
         played_steps = 0
@@ -183,14 +182,12 @@ class MuZero:
             self.test()
             self.debug()
             self.run_log(episode)
-            if record_video:
+            if self.config.record_video:
                 self.record_worker.start_record()
 
         self.terminate_workers()
 
-    def test(self, model_path=None):
-        if model_path is not None:
-            self.model.load_state_dict(model_path)
+    def test(self):
         total_reward, mean_value, episode_length = 0, 0, 0
         # for i in tqdm(range(self.config.test_times)):
         for i in range(self.config.test_times):
@@ -300,6 +297,12 @@ class MuZero:
         self.debug_worker = None
         self.record_worker = None
 
+    def evaluate(self, ckpt_path, render=False):
+        self.checkpoint = torch.load(ckpt_path)
+        self.model.set_weights(self.checkpoint["weights"])
+        self.record_worker = self_play.RecordPlay(self.model, self.config)
+        total_reward = self.record_worker.start_record(render=render)
+        print(f"total reward: {total_reward}")
 
 class Actor:
     def __init__(self, config):
@@ -360,11 +363,13 @@ class Actor:
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--game', type=str, default="cartpole",
+    parser.add_argument('--game', type=str, default="mountaincar",
                         help='game name')
-    parser.add_argument('--config', type=str, default="none",
+    parser.add_argument('--config', type=str, default="{'hypermodel':[0,0,1],'use_priormodel':True,'record_video':True,'use_mcts':False}",
                         help='game config')
-    parser.add_argument('--record-video', default=False, action='store_true')
+    parser.add_argument('--ckpt-path', type=str, default="",
+                        help='game config')
+    parser.add_argument('--render', default=False, action='store_true')
     args = parser.parse_args()
     return args
 
@@ -375,5 +380,8 @@ if __name__ == "__main__":
     config = eval(args.config) if args.config != "none" else None
     glog.info(f"this is game: {game}")
     muzero = MuZero(game, config)
-    muzero.train(args.record_video)
+    if args.ckpt_path:
+        muzero.evaluate(args.ckpt_path, args.render)
+    else:
+        muzero.train()
 

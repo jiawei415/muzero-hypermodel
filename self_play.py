@@ -201,37 +201,53 @@ class RecordPlay:
         self.config = config
         game_module = importlib.import_module("games." + self.config.game_filename)
         Game = game_module.Game
-        self.game = Game(config, record_video=True)
+        self.game = Game(config, record_video=self.config.record_video)
         self.model = model
         self.noise_dim = int(self.config.hyper_inp_dim)
 
-    def start_record(self):
+    def start_record(self, render=False):
         done = False
         noise_z = numpy.random.normal(0, 1, [1, self.noise_dim]) * self.config.normal_noise_std
         observation = self.game.reset()
+        if render:
+            self.game.render()
         game_history = GameHistory()
         game_history.action_history.append(0)
         game_history.observation_history.append(observation)
         self.model.eval()
-        while not done:
+        while not done and len(game_history.action_history) <= self.config.max_moves:
             with torch.no_grad():
                 stacked_observations = game_history.get_stacked_observations(
                     -1,
                     self.config.stacked_observations,
                 )
                 # Choose the action
-                root, mcts_info = MCTS(self.config).run(
-                    noise_z,
-                    self.config.num_simulations,
-                    self.model,
-                    stacked_observations,
-                    self.game.legal_actions(),
-                    self.game.to_play(),
-                    True,
-                )
-                action = self.select_action(root, temperature=0)
+                if self.config.use_mcts:
+                    root, mcts_info = MCTS(self.config).run(
+                        noise_z,
+                        self.config.num_simulations,
+                        self.model,
+                        stacked_observations,
+                        self.game.legal_actions(),
+                        self.game.to_play(),
+                        True,
+                    )
+                    action = self.select_action(root, temperature=0)
+                else:
+                    obs = torch.tensor(stacked_observations).float().unsqueeze(0)
+                    noise_z = torch.tensor(noise_z).float()
+                    _, _, logits, _, _ = self.model.initial_inference(
+                        obs.to(next(self.model.parameters()).device),
+                        noise_z.to(next(self.model.parameters()).device)
+                    )
+                    policy = torch.softmax(logits, dim=1).squeeze().numpy()
+                    action = numpy.random.choice(self.config.action_space, 1, p=policy).squeeze()
                 observation, reward, done = self.game.step(action)
+                if render:
+                    self.game.render()
                 game_history.action_history.append(action)
+                game_history.reward_history.append(reward)
+        return sum(game_history.reward_history)
 
     @staticmethod
     def select_action(node, temperature):

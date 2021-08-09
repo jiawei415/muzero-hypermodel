@@ -66,9 +66,9 @@ def gen_ydata(ys, min_len, weight):
     y = smooth(np.mean(y_matrix, axis=0), weight)
     return y, y_min, y_max
 
-game_name = "deepsea"
-action_num = 2
-time_tag = "20210805"
+game_name = "mountaincar"
+action_num = 3
+time_tag = "20210807"
 log_path = f"./results/{game_name}/{time_tag}"
 labels = {"+hyper": "hypermodel", "+prior": "priormodel", "+normal": "normalization", "+target": "target_noise", "+reg": "use_reg_loss"}
 

@@ -50,7 +50,9 @@ class BasicConfig():
         # Evaluate
         self.test_times = 5
         self.debug_times = 10
+        self.record_video = False
         self.record_frequency = 10
+        self.use_mcts = True
 
         ### Self-Play
         self.max_moves = 500  # Maximum number of moves if game is not finished before
