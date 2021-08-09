@@ -50,7 +50,8 @@ class MuZero:
             "terminate": False,
         }
         actor = Actor(self.config)
-        weights, summary, self.model, self.target_model, self.optimizer = actor.initial_model_and_optimizer()
+        self.model, self.target_model, weights, summary = actor.initial_model()
+        self.optimizer = actor.initial_optimizer(self.model)
         self.checkpoint["weights"] = copy.deepcopy(weights)
         self.summary = copy.deepcopy(summary)
         # Workers
@@ -314,7 +315,7 @@ class Actor:
     def __init__(self, config):
         self.config = config
 
-    def initial_model_and_optimizer(self):
+    def initial_model(self):
         device = "cuda" if torch.cuda.is_available() else "cpu"
         model = models.MuZeroNetwork(self.config).to(device)
         target_model = models.MuZeroNetwork(self.config).to(device)
@@ -323,10 +324,9 @@ class Actor:
         target_model.set_weights(weigths)
         target_model.init_norm = model.init_norm
         target_model.target_norm = model.target_norm
-        optimizer = self.initial_optimizer(model)
         if "cuda" not in str(next(model.parameters()).device):
             print("You are not training on GPU.\n")
-        return weigths, summary, model, target_model, optimizer
+        return model, target_model, weigths, summary
 
     def initial_optimizer(self, model):
         # Initialize the optimizer
