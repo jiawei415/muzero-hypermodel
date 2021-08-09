@@ -139,7 +139,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         prior_B = normal_deviates / radius
         prior_D = numpy.eye(out_dim)
         prior_params = torch.from_numpy(prior_D.dot(prior_B)).float()
-        return prior_params.T
+        return torch.nn.parameter.Parameter(prior_params.T, requires_grad=False)
     
     def representation(self, observation):
         encoded_state = self.representation_network(
@@ -294,20 +294,27 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         return params
 
     def gen_norm(self, params, norm_type):
+        self.init_norm, self.target_norm = {}, {}
         print(f"gen {norm_type} norm!")
         for param in params:
             if norm_type == "reward":
                 self.init_reward_norm.append(torch.norm(param).detach().numpy())
                 self.target_reward_norm.append(torch.norm(torch.nn.init.xavier_normal_(
                     torch.empty(size=param.size()))).detach().numpy())
+                self.init_norm['reward'] = self.init_reward_norm
+                self.target_norm['reward'] = self.target_reward_norm
             elif norm_type == "state":
                 self.init_state_norm.append(torch.norm(param).detach().numpy())
                 self.target_state_norm.append(torch.norm(torch.nn.init.xavier_normal_(
                     torch.empty(size=param.size()))).detach().numpy())
+                self.init_norm['state'] = self.init_state_norm
+                self.target_norm['state'] = self.target_state_norm
             elif norm_type == "value":
                 self.init_value_norm.append(torch.norm(param).detach().numpy())
                 self.target_value_norm.append(torch.norm(torch.nn.init.xavier_normal_(
                     torch.empty(size=param.size()))).detach().numpy())
+                self.init_norm['value'] = self.init_value_norm
+                self.target_norm['value'] = self.target_value_norm
 
     def get_hypermodel(self,):
         hypermodel_std = dict()

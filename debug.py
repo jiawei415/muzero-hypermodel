@@ -66,9 +66,9 @@ class Debug:
                 model_value = support_to_scalar(model_value, self.config.support_size).item()
                 self.value_log['model_value'].append(model_value)
                 debug_policy = torch.softmax(debug_logits, dim=1).squeeze()
-                for i in self.config.action_space:
-                    self.actions_log[f"mcts_action_{i}"].append(root.children[i].prior)
-                    self.actions_log[f"model_action_{i}"].append(debug_policy[i].item())
+                for j in self.config.action_space:
+                    self.actions_log[f"mcts_action_{j}"].append(root.children[j].prior)
+                    self.actions_log[f"model_action_{j}"].append(debug_policy[j].item())
                 debug_params = self.model.debug(noise_z.to(next(self.model.parameters()).device))
                 for k, v in debug_params.items():
                     if "value" in k and v is not None:

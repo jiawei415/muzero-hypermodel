@@ -31,6 +31,8 @@ class MuZero:
         self.checkpoint = {
             "weights": None,
             "optimizer_state": None,
+            "init_norm": None,
+            "target_norm": None,
             "train_total_reward": 0,
             "train_episode_length": 0,
             "train_mean_value": 0,
@@ -130,9 +132,7 @@ class MuZero:
     def train(self):
         self.init_workers()
         self.start_train = False
-        played_games = 0
-        played_steps = 0
-        training_steps = 0
+        played_games, played_steps, training_steps = 0, 0, 0
         for episode in range(self.config.total_episode):
             done = False
             game_history = self.self_play_worker.start_game()
@@ -150,15 +150,7 @@ class MuZero:
                     # for _ in tqdm(range(train_times)):
                     for _ in range(train_times):
                         if training_steps % self.config.checkpoint_interval == 0:
-                            self.shared_storage_worker.set_info(
-                                {
-                                    "weights": copy.deepcopy(self.model.get_weights()),
-                                    "optimizer_state": copy.deepcopy(
-                                        models.dict_to_cpu(self.optimizer.state_dict())
-                                    ),
-                                }
-                            )
-                            if self.config.save_model: self.shared_storage_worker.save_checkpoint()
+                            self.save_checkpoint()
                         index_batch, batch = self.replay_buffer_worker.get_batch()
                         priorities, losses = self.training_worker.train_game(batch, training_steps)
                         if self.config.PER:
@@ -268,7 +260,6 @@ class MuZero:
         """
         if self.config.save_model:
             # Persist replay buffer to disk
-            print("\n\nPersisting replay buffer games to disk...")
             saved_keys = ['played_games', 'played_steps']
             saved_info = self.shared_storage_worker.get_info(saved_keys)
             pickle.dump(
@@ -279,6 +270,7 @@ class MuZero:
                 },
                 open(os.path.join(self.config.results_path, "replay_buffer.pkl"), "wb"),
             )
+            self.save_checkpoint()
         if self.shared_storage_worker:
             self.shared_storage_worker.set_info("terminate", True)
             self.checkpoint = self.shared_storage_worker.get_checkpoint()
@@ -297,6 +289,20 @@ class MuZero:
         self.debug_worker = None
         self.record_worker = None
 
+    def save_checkpoint(self):
+        self.shared_storage_worker.set_info(
+            {
+                "weights": copy.deepcopy(self.model.get_weights()),
+                "optimizer_state": copy.deepcopy(
+                    models.dict_to_cpu(self.optimizer.state_dict())
+                ),
+                "init_norm": copy.deepcopy(self.model.init_norm),
+                "target_norm": copy.deepcopy(self.model.target_norm),
+            }
+        )
+        if self.config.save_model:
+            self.shared_storage_worker.save_checkpoint()
+
     def evaluate(self, ckpt_path, render=False):
         self.checkpoint = torch.load(ckpt_path)
         self.model.set_weights(self.checkpoint["weights"])
@@ -312,23 +318,19 @@ class Actor:
         device = "cuda" if torch.cuda.is_available() else "cpu"
         model = models.MuZeroNetwork(self.config).to(device)
         target_model = models.MuZeroNetwork(self.config).to(device)
-        target_model.load_state_dict(model.state_dict())
+        weigths = model.get_weights()
+        summary = str(model).replace("\n", " \n\n")
+        target_model.set_weights(weigths)
         value_normal, reward_normal, state_normal = self.config.normalization
         if value_normal:
             target_model.init_value_norm = model.init_value_norm
             target_model.target_value_norm = model.target_value_norm
-            target_model.value_prior_params = model.value_prior_params
         if reward_normal:
             target_model.init_reward_norm = model.init_reward_norm
             target_model.target_reward_norm = model.target_reward_norm
-            target_model.reward_prior_params = model.reward_prior_params
         if state_normal:
             target_model.init_state_norm = model.init_state_norm
             target_model.target_state_norm = model.target_state_norm
-            target_model.state_prior_params = model.state_prior_params
-        # print("\n", model)
-        weigths = model.get_weights()
-        summary = str(model).replace("\n", " \n\n")
         optimizer = self.initial_optimizer(model)
         if "cuda" not in str(next(model.parameters()).device):
             print("You are not training on GPU.\n")
@@ -365,7 +367,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--game', type=str, default="mountaincar",
                         help='game name')
-    parser.add_argument('--config', type=str, default="{'hypermodel':[0,0,1],'use_priormodel':True,'record_video':True,'use_mcts':False}",
+    parser.add_argument('--config', type=str, default="",
                         help='game config')
     parser.add_argument('--ckpt-path', type=str, default="",
                         help='game config')
