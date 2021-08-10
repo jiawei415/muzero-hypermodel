@@ -54,6 +54,7 @@ class MuZero:
         self.optimizer = actor.initial_optimizer(self.model)
         self.checkpoint["weights"] = copy.deepcopy(weights)
         self.summary = copy.deepcopy(summary)
+        self.best_reward = float("-inf")
         # Workers
         self.self_play_worker = None
         self.training_worker = None
@@ -199,6 +200,9 @@ class MuZero:
                 "test_episode_length": episode_length/self.config.test_times,
             }
         )
+        if total_reward/self.config.test_times > self.best_reward:
+            self.best_reward = total_reward/self.config.test_times
+            self.save_checkpoint(path="model_best.checkpoint")
 
     def debug(self):
         counter = self.shared_storage_worker.get_info("played_steps")
@@ -290,7 +294,7 @@ class MuZero:
         self.debug_worker = None
         self.record_worker = None
 
-    def save_checkpoint(self):
+    def save_checkpoint(self, path=None):
         self.shared_storage_worker.set_info(
             {
                 "weights": copy.deepcopy(self.model.get_weights()),
@@ -302,7 +306,7 @@ class MuZero:
             }
         )
         if self.config.save_model:
-            self.shared_storage_worker.save_checkpoint()
+            self.shared_storage_worker.save_checkpoint(path=path)
 
     def evaluate(self, ckpt_path, render=False):
         self.checkpoint = torch.load(ckpt_path)

@@ -68,7 +68,7 @@ def gen_ydata(ys, min_len, weight):
 
 game_name = "mountaincar"
 action_num = 3
-time_tag = "20210807"
+time_tag = "202108060"
 log_path = f"./results/{game_name}/{time_tag}"
 labels = {"+hyper": "hypermodel", "+prior": "priormodel", "+normal": "normalization", "+target": "target_noise", "+reg": "use_reg_loss"}
 
@@ -91,7 +91,7 @@ for root, dirs, files in os.walk(log_path):
             if (isinstance(conf, list) and 1 in conf) or (isinstance(conf, bool) and conf):
                 label += k
         debug_logs = pd.read_csv(os.path.join(root, files[1]), sep="\t")
-        player_logs = pd.read_csv(os.path.join(root, files[3]), sep="\t")
+        player_logs = pd.read_csv(os.path.join(root, files[-1]), sep="\t")
         for k, v in player_datas.items():
             if label in v.keys():
                 v[label].append(player_logs[k].to_numpy())
