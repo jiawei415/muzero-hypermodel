@@ -13,9 +13,10 @@ class SharedStorage:
         self.current_checkpoint = copy.deepcopy(checkpoint)
 
     def save_checkpoint(self, path=None):
+        os.makedirs(os.path.join(self.config.results_path, "models"), exist_ok=True)
         if not path:
-            path = os.path.join(self.config.results_path, "model.checkpoint")
-        torch.save(self.current_checkpoint, os.path.join(self.config.results_path, path))
+            path = os.path.join(self.config.results_path, "models", "model.checkpoint")
+        torch.save(self.current_checkpoint, os.path.join(self.config.results_path, "models", path))
 
     def get_checkpoint(self):
         return copy.deepcopy(self.current_checkpoint)

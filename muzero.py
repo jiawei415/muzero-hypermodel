@@ -176,6 +176,7 @@ class MuZero:
             self.test()
             self.debug()
             self.run_log(episode)
+            self.save_checkpoint(path=f"model{'%03d' % played_games}.checkpoint")
             if self.config.record_video:
                 self.record_worker.start_record()
 
@@ -364,9 +365,9 @@ def get_args():
     parser.add_argument('--game', type=str, default="mountaincar",
                         help='game name')
     parser.add_argument('--config', type=str, default="none",
-                        help='game config')
+                        help="game config eg., {'seed':0,'PER':False,'train_mode':2,'total_episode':400,'train_frequency':100,'train_proportion':1,'hypermodel':[0,0,1],'use_priormodel':True}")
     parser.add_argument('--ckpt-path', type=str, default="",
-                        help='game config')
+                        help="checkpoint path for evaluation")
     parser.add_argument('--render', default=False, action='store_true')
     args = parser.parse_args()
     return args

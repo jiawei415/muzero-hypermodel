@@ -68,7 +68,7 @@ def gen_ydata(ys, min_len, weight):
 
 game_name = "mountaincar"
 action_num = 3
-time_tag = "202108060"
+time_tag = "2021080601"
 log_path = f"./results/{game_name}/{time_tag}"
 labels = {"+hyper": "hypermodel", "+prior": "priormodel", "+normal": "normalization", "+target": "target_noise", "+reg": "use_reg_loss"}
 
