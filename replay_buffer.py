@@ -353,19 +353,18 @@ class Reanalyse:
     def reanalyse(self, game_history, seed, start, end):
         setup_seed(seed)
         target_game_history = copy.deepcopy(game_history)
-        if self.config.all_reanalyse:
-            start = 0
-            end = len(game_history.root_values)
-            target_game_history.child_visits = []
-            target_game_history.root_values = []
-        else:
-            target_game_history.child_visits[start:] = []
-            target_game_history.root_values[start:] = []
         target_noise_z = numpy.random.normal(0, 1, [1, self.noise_dim]) * self.config.normal_noise_std
         target_game_history.noise_history = target_noise_z
-        for i in range(start, end):
+        if self.config.all_reanalyse:
+            indexs = list(range(len(game_history.root_values)))
+        else:
+            start1, start2 = start, max(start, end - self.config.num_unroll_steps - 1)
+            end1, end2 = min(end, start + self.config.num_unroll_steps + 1), end
+            indexs = list(range(start1, end1)) + list(range(start2, end2))
+        indexs = set(indexs)
+        for index in indexs:
             stacked_observations = target_game_history.get_stacked_observations(
-                i,
+                index,
                 self.config.stacked_observations,
             )
             root, mcts_info = MCTS(self.config).run(
@@ -377,7 +376,7 @@ class Reanalyse:
                 self.game.to_play(),
                 True,
             )
-            target_game_history.store_search_statistics(root, self.config.action_space)
+            target_game_history.store_target_search_statistics(index, root, self.config.action_space)
 
         return target_game_history
 

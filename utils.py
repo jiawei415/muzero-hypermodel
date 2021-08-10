@@ -273,6 +273,20 @@ class GameHistory:
         else:
             self.root_values.append(None)
 
+    def store_target_search_statistics(self, index, root, action_space):
+        # Turn visit count from root into a policy
+        if root is not None:
+            sum_visits = sum(child.visit_count for child in root.children.values())
+            self.child_visits[index] = [
+                    root.children[a].visit_count / sum_visits
+                    if a in root.children
+                    else 0
+                    for a in action_space
+                ]
+            self.root_values[index] = root.value()
+        else:
+            self.root_values[index] = None
+
     def get_stacked_observations(self, index, num_stacked_observations):
         """
         Generate a new observation with the observation at the index position
