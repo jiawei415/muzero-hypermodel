@@ -1,8 +1,8 @@
-from math import gamma
 import numpy
 import torch
 import importlib
 import pandas as pd
+from tqdm import tqdm
 from utils import MCTS, GameHistory, support_to_scalar
 
 class Debug:
@@ -39,6 +39,7 @@ class Debug:
                 -1,
                 self.config.stacked_observations,
             )
+            # for i in tqdm(range(self.config.debug_times)):
             for i in range(self.config.debug_times):
                 noise_z = numpy.random.normal(0, 1, [1, self.noise_dim]) * self.config.normal_noise_std
                 root, mcts_info = MCTS(self.config).run(
