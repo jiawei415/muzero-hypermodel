@@ -79,7 +79,8 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             state_params_inp_dim = config.hyper_inp_dim
             state_params_out_dim = sum(self.state_sizes)
             self.state_params = torch.nn.Linear(state_params_inp_dim, state_params_out_dim)
-            self.state_prior_params = self.gen_prior_params(state_params_inp_dim, state_params_out_dim)
+            if self.state_prior:
+                self.state_prior_params = self.gen_prior_params(state_params_inp_dim, state_params_out_dim)
             if self.state_normal:
                 self.init_norm['state'], self.target_norm['state'] = [], []
         else:
@@ -98,7 +99,8 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             reward_params_inp_dim = config.hyper_inp_dim
             reward_params_out_dim = sum(self.reward_sizes)
             self.reward_params = torch.nn.Linear(reward_params_inp_dim, reward_params_out_dim)
-            self.reward_prior_params = self.gen_prior_params(reward_params_inp_dim, reward_params_out_dim)
+            if self.reward_prior:
+                self.reward_prior_params = self.gen_prior_params(reward_params_inp_dim, reward_params_out_dim)
             if self.reward_normal:
                 self.init_norm['reward'], self.target_norm['reward'] = [], []
         else:
@@ -117,7 +119,8 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             value_params_inp_dim = config.hyper_inp_dim
             value_params_out_dim = sum(self.value_sizes)
             self.value_params = torch.nn.Linear(value_params_inp_dim, value_params_out_dim)
-            self.value_prior_params = self.gen_prior_params(value_params_inp_dim, value_params_out_dim)
+            if self.value_prior:
+                self.value_prior_params = self.gen_prior_params(value_params_inp_dim, value_params_out_dim)
             if self.value_normal:
                 self.init_norm['value'], self.target_norm['value'] = [], []
         else:
@@ -160,8 +163,11 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         policy_logits = self.prediction_policy_network(encoded_state)
         if self.value_hyper:
             value_params = self.value_params(noise_z)
-            value_prior_params = torch.mm(noise_z, self.value_prior_params.to(noise_z.device))
-            value_params_ = value_params + value_prior_params if self.value_prior else value_params
+            if self.value_prior:
+                value_prior_params = torch.mm(noise_z, self.value_prior_params.to(noise_z.device))
+                value_params_ = value_params + value_prior_params
+            else:
+                value_params_ = value_params
             split_params = self.split_params(value_params_, "value")
             if self.value_normal:
                 if len(self.init_norm['value']) == 0:
@@ -185,8 +191,11 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
 
         if self.state_hyper:
             state_params = self.state_params(noise_z)
-            state_prior_params = torch.mm(noise_z, self.state_prior_params.to(noise_z.device))
-            state_params_ = state_params + state_prior_params if self.state_prior else state_params
+            if self.state_prior:
+                state_prior_params = torch.mm(noise_z, self.state_prior_params.to(noise_z.device))
+                state_params_ = state_params + state_prior_params
+            else:
+                state_params_ = state_params
             split_params = self.split_params(state_params_, "state")
             if self.state_normal:
                 if len(self.init_norm['state']) == 0:
@@ -199,8 +208,11 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
 
         if self.reward_hyper:
             reward_params = self.reward_params(noise_z)
-            reward_prior_params = torch.mm(noise_z, self.reward_prior_params.to(noise_z.device))
-            reward_params_ = reward_params + reward_prior_params if self.reward_prior else reward_params
+            if self.reward_prior:
+                reward_prior_params = torch.mm(noise_z, self.reward_prior_params.to(noise_z.device))
+                reward_params_ = reward_params + reward_prior_params
+            else:
+                reward_params_ = reward_params
             split_params = self.split_params(reward_params_, "reward")
             if self.reward_normal:
                 if len(self.init_norm['reward']) == 0:
