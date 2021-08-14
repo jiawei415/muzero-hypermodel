@@ -19,11 +19,11 @@ class BasicConfig():
         self.normal_noise_std = 1
         self.target_noise_std = 0.1
         self.hyper_inp_dim = 32
-        self.num_simulations = 50  
+        self.num_simulations = 50
         self.reanalyse_num_simulations = 10
         self.target_update_freq = 100
         self.num_unroll_steps = 10
-        self.td_steps = 50  
+        self.td_steps = 5
         self.train_frequency = 100
         self.train_proportion = 0.1
         self.start_train = 1
@@ -76,7 +76,7 @@ class BasicConfig():
         self.training_steps = 10000  # Total number of training steps (ie weights update according to a batch)
         self.batch_size = 128  # Number of parts of games to train on at each training step
         self.checkpoint_interval = 100  # Number of training steps before using the model for self-playing
-        self.value_loss_weight = 1  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
+        self.value_loss_weight = 0.25  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
         self.optimizer = "Adam"  # "Adam" or "SGD". Paper uses SGD
         self.weight_decay = 1e-4  # L2 weights regularization
         self.momentum = 0.9  # Used only if optimizer is SGD
