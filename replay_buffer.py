@@ -66,9 +66,7 @@ class ReplayBuffer:
         for game_data in game_datas:
             seed, game_id, game_history, game_prob, game_pos, pos_prob = game_data
             if self.config.use_reanalyse:
-                start_index = game_pos
-                end_index = min(game_pos + self.config.num_unroll_steps + self.config.td_steps + 1, len(game_history.root_values))
-                target_game_history = self.reanalyse_worker.reanalyse(game_history, seed, start_index, end_index)
+                target_game_history = self.reanalyse_worker.reanalyse(game_history, seed, game_pos)
             else:
                 target_game_history = game_history
             target_game_datas.append((game_id, target_game_history, game_prob, game_pos, pos_prob))
@@ -350,17 +348,19 @@ class Reanalyse:
         self.target_model.eval()
         self.noise_dim = int(self.config.hyper_inp_dim)
 
-    def reanalyse(self, game_history, seed, start, end):
+    def reanalyse(self, game_history, seed, start_index):
         setup_seed(seed)
         target_game_history = copy.deepcopy(game_history)
         target_noise_z = numpy.random.normal(0, 1, [1, self.noise_dim]) * self.config.normal_noise_std
         target_game_history.noise_history = target_noise_z
+        game_len = len(game_history.root_values)
         if self.config.all_reanalyse:
-            indexs = list(range(len(game_history.root_values)))
+            indexs = list(range(game_len))
         else:
-            start1, start2 = start, max(start, end - self.config.num_unroll_steps - 1)
-            end1, end2 = min(end, start + self.config.num_unroll_steps + 1), end
-            indexs = list(range(start1, end1)) + list(range(start2, end2))
+            indexs1 = list(range(start_index, min(game_len, start_index + self.config.num_unroll_steps + 1)))
+            indexs2 = list(range(min(game_len, start_index + self.config.td_steps),
+                        min(game_len, start_index + self.config.num_unroll_steps + 1 + self.config.td_steps)))
+            indexs = indexs1 + indexs2
         indexs = set(indexs)
         for index in indexs:
             stacked_observations = target_game_history.get_stacked_observations(
