@@ -66,9 +66,9 @@ def gen_ydata(ys, min_len, weight):
     y = smooth(np.mean(y_matrix, axis=0), weight)
     return y, y_min, y_max
 
-game_name = "mountaincar"
-action_num = 3
-time_tag = "2021080601"
+game_name = "deepsea"
+action_num = 2
+time_tag = "2021081501"
 log_path = f"./results/{game_name}/{time_tag}"
 labels = {"+hyper": "hypermodel", "+prior": "priormodel", "+normal": "normalization", "+target": "target_noise", "+reg": "use_reg_loss"}
 
@@ -255,7 +255,7 @@ def plot_all(wanted, xs, value, action, scalar):
         plt.show()
 
 # COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
-COLORS = ['darkgreen', 'darkred', 'lightblue', 'green', 'red','blue', 'orange', 'darkred', 'darkblue', 'black', 'yellow', 'magenta', 'cyan', 'purple', 'pink',
+COLORS = ['darkgreen', 'darkred', 'lightblue', 'green', 'red','blue', 'orange', 'darkred', 'darkblue', 'black', 'magenta', 'yellow', 'magenta', 'cyan', 'purple', 'pink',
           'brown', 'orange', 'teal', 'lightblue', 'lime', 'lavender', 'tan']
 
 wanted1 = ['muzero_p', 'muzero_np']
@@ -277,11 +277,11 @@ for suffix in ["np_reward", "np_state", "np_reward_state"]:
     wanted7 = [f'muzero_{suffix}+hyper+prior', f'muzero_{suffix}+hyper+prior+target']
     wanteds = [wanted1, wanted2, wanted3, wanted4, wanted5]
 
-    # if "value" in suffix: params_std = value_params_std
-    if "reward" in suffix: params_std = reward_params_std
-    if "state" in suffix: params_std = state_params_std
-
-    scalars = {"total reward": test_reward, f"{suffix} variance": params_std}
+    scalars = {"total reward": test_reward}
+    if reward_params_std != {}:
+        scalars.update({"reward variance": reward_params_std})
+    if state_params_std != {}:
+        scalars.update({"state variance": state_params_std})
     if value_loss != {}:
         scalars.update({"value loss": value_loss})
     if reward_loss != {}:
