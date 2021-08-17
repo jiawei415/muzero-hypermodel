@@ -238,8 +238,10 @@ class RecordPlay:
                 observation, reward, done = self.game.step(action)
                 if render:
                     self.game.render()
+                game_history.observation_history.append(observation)
                 game_history.action_history.append(action)
                 game_history.reward_history.append(reward)
+                game_history.to_play_history.append(self.game.to_play())
         return sum(game_history.reward_history)
 
     @staticmethod
