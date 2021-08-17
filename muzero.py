@@ -314,6 +314,9 @@ class MuZero:
     def evaluate(self, ckpt_path, render=False):
         self.checkpoint = torch.load(ckpt_path)
         self.model.set_weights(self.checkpoint["weights"])
+        self.model.init_norm = self.checkpoint["init_norm"]
+        self.model.target_norm = self.checkpoint["target_norm"]
+        self.model.prior_params = self.checkpoint["prior_params"]
         self.record_worker = self_play.RecordPlay(self.model, self.config)
         total_reward = self.record_worker.start_record(render=render)
         print(f"total reward: {total_reward}")
