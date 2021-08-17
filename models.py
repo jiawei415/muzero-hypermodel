@@ -55,7 +55,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         self.value_prior, self.reward_prior, self.state_prior = config.priormodel
         self.value_hyper, self.reward_hyper, self.state_hyper = config.hypermodel
         self.value_normal, self.reward_normal, self.state_normal = config.normalization
-        self.init_norm, self.target_norm = {}, {}
+        self.init_norm, self.target_norm, self.prior_params = {}, {}, {}
         self.config = config
 
         if not self.config.use_representation and self.config.stacked_observations == 0:
@@ -80,7 +80,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             state_params_out_dim = sum(self.state_sizes)
             self.state_params = torch.nn.Linear(state_params_inp_dim, state_params_out_dim)
             if self.state_prior:
-                self.state_prior_params = self.gen_prior_params(state_params_inp_dim, state_params_out_dim)
+                self.prior_params['state'] = self.gen_prior_params(state_params_inp_dim, state_params_out_dim)
             if self.state_normal:
                 self.init_norm['state'], self.target_norm['state'] = [], []
         else:
@@ -100,7 +100,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             reward_params_out_dim = sum(self.reward_sizes)
             self.reward_params = torch.nn.Linear(reward_params_inp_dim, reward_params_out_dim)
             if self.reward_prior:
-                self.reward_prior_params = self.gen_prior_params(reward_params_inp_dim, reward_params_out_dim)
+                self.prior_params['reward'] = self.gen_prior_params(reward_params_inp_dim, reward_params_out_dim)
             if self.reward_normal:
                 self.init_norm['reward'], self.target_norm['reward'] = [], []
         else:
@@ -120,7 +120,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             value_params_out_dim = sum(self.value_sizes)
             self.value_params = torch.nn.Linear(value_params_inp_dim, value_params_out_dim)
             if self.value_prior:
-                self.value_prior_params = self.gen_prior_params(value_params_inp_dim, value_params_out_dim)
+                self.prior_params['value'] = self.gen_prior_params(value_params_inp_dim, value_params_out_dim)
             if self.value_normal:
                 self.init_norm['value'], self.target_norm['value'] = [], []
         else:
@@ -143,7 +143,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         prior_B = normal_deviates / radius
         prior_D = numpy.eye(out_dim)
         prior_params = torch.from_numpy(prior_D.dot(prior_B)).float()
-        return torch.nn.parameter.Parameter(prior_params.T, requires_grad=False)
+        return prior_params.T
     
     def representation(self, observation):
         encoded_state = self.representation_network(
@@ -164,7 +164,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         if self.value_hyper:
             value_params = self.value_params(noise_z)
             if self.value_prior:
-                value_prior_params = torch.mm(noise_z, self.value_prior_params.to(noise_z.device))
+                value_prior_params = torch.mm(noise_z, self.prior_params['value'].to(noise_z.device))
                 value_params_ = value_params + value_prior_params
             else:
                 value_params_ = value_params
@@ -192,7 +192,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         if self.state_hyper:
             state_params = self.state_params(noise_z)
             if self.state_prior:
-                state_prior_params = torch.mm(noise_z, self.state_prior_params.to(noise_z.device))
+                state_prior_params = torch.mm(noise_z, self.prior_params['state'].to(noise_z.device))
                 state_params_ = state_params + state_prior_params
             else:
                 state_params_ = state_params
@@ -209,7 +209,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         if self.reward_hyper:
             reward_params = self.reward_params(noise_z)
             if self.reward_prior:
-                reward_prior_params = torch.mm(noise_z, self.reward_prior_params.to(noise_z.device))
+                reward_prior_params = torch.mm(noise_z, self.prior_params['reward'].to(noise_z.device))
                 reward_params_ = reward_params + reward_prior_params
             else:
                 reward_params_ = reward_params

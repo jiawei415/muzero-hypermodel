@@ -33,6 +33,7 @@ class MuZero:
             "optimizer_state": None,
             "init_norm": None,
             "target_norm": None,
+            "prior_params": None,
             "train_total_reward": 0,
             "train_episode_length": 0,
             "train_mean_value": 0,
@@ -304,6 +305,7 @@ class MuZero:
                 ),
                 "init_norm": copy.deepcopy(self.model.init_norm),
                 "target_norm": copy.deepcopy(self.model.target_norm),
+                "prior_params": copy.deepcopy(self.model.prior_params),
             }
         )
         if self.config.save_model:
@@ -329,6 +331,7 @@ class Actor:
         target_model.set_weights(weigths)
         target_model.init_norm = model.init_norm
         target_model.target_norm = model.target_norm
+        target_model.prior_params = model.prior_params
         if "cuda" not in str(next(model.parameters()).device):
             print("You are not training on GPU.\n")
         return model, target_model, weigths, summary
@@ -364,7 +367,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--game', type=str, default="mountaincar",
                         help='game name')
-    parser.add_argument('--config', type=str, default="none",
+    parser.add_argument('--config', type=str, default="{}",
                         help="game config eg., {'seed':0,'PER':False,'train_mode':2,'total_episode':400,'train_frequency':100,'train_proportion':1,'hypermodel':[0,0,1],'use_priormodel':True}")
     parser.add_argument('--ckpt-path', type=str, default="",
                         help="checkpoint path for evaluation")
