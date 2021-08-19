@@ -96,3 +96,4 @@ results/
 tmp*
 figures
 *.png
+cp_muzero.sh
