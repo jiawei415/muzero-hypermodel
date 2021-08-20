@@ -68,7 +68,7 @@ def gen_ydata(ys, min_len, weight):
 
 game_name = "deepsea"
 action_num = 2
-time_tag = "2021081501"
+time_tag = "2021081806"
 log_path = f"./results/{game_name}/{time_tag}"
 labels = {"+hyper": "hypermodel", "+prior": "priormodel", "+normal": "normalization", "+target": "target_noise", "+reg": "use_reg_loss"}
 
@@ -76,12 +76,16 @@ for root, dirs, files in os.walk(log_path):
     for name in dirs:
         print(os.path.join(root, name))
     if len(files) != 0:
+        if 'model' in files[0]:
+            continue
         files = sorted(files)
         label = "muzero"
         config = pd.read_csv(os.path.join(root, files[0]), sep="\t")
         seed = config[config.key == "seed"].value.to_list()[0]
+        td_steps = config[config.key == "td_steps"].value.to_list()[0]
+        value_loss_weight = config[config.key == "value_loss_weight"].value.to_list()[0]
         # label += f"_{seed}"
-        label += "_p" if eval(config[config.key == "PER"].value.to_list()[0]) else "_np"
+        # label += "_p" if eval(config[config.key == "PER"].value.to_list()[0]) else "_np"
         v, r, s = eval(config[config.key == "hypermodel"].value.to_list()[0])
         if v == 1: label += '_value'
         if r == 1: label += '_reward'
@@ -90,6 +94,7 @@ for root, dirs, files in os.walk(log_path):
             conf = eval(config[config.key == v].value.to_list()[0])
             if (isinstance(conf, list) and 1 in conf) or (isinstance(conf, bool) and conf):
                 label += k
+        label += f"_{td_steps}_{value_loss_weight}"
         debug_logs = pd.read_csv(os.path.join(root, files[1]), sep="\t")
         player_logs = pd.read_csv(os.path.join(root, files[-1]), sep="\t")
         for k, v in player_datas.items():
@@ -214,9 +219,10 @@ def plot_distribution(xs, ys, ylabel, weight=0.6, plot_mean=True):
 
 def plot_all(wanted, xs, value, action, scalar):
     weight = 0.8
-    for i, label in enumerate(wanted):
-        if label not in xs.keys():
-            continue
+    # for i, label in enumerate(wanted):
+    #     if label not in xs.keys():
+    #         continue
+    for label in xs.keys():
         fig, axes = plt.subplots(len(scalar) + 2, 1, figsize=(20, 30))
         fig.suptitle(f"{game_name}_{label}")
         min_len = min([len(x) for x in xs[label]])
@@ -251,7 +257,7 @@ def plot_all(wanted, xs, value, action, scalar):
 
         plt.xlabel('smaple num')
         plt.subplots_adjust(wspace=0, hspace=0.2)
-        plt.savefig(f"./figures/{time_tag}_{game_name}_{label}")
+        plt.savefig(f"./figures/{time_tag}_{game_name}_{label}.png")
         plt.show()
 
 # COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
@@ -264,7 +270,7 @@ if value_loss != {}:
     scalars.update({"value loss": value_loss})
 if reward_loss != {}:
     scalars.update({"reward loss": reward_loss})
-plot_all(wanted1, played_step, value_mean_datas, action_mean_datas, scalars)
+# plot_all(wanted1, played_step, value_mean_datas, action_mean_datas, scalars)
 
 # for suffix in ["p_value", "p_reward", "p_state", "np_value", "np_reward", "np_state"]:
 # for suffix in ["p_reward", "p_state", "np_reward", "np_state"]:
@@ -286,8 +292,9 @@ for suffix in ["np_reward", "np_state", "np_reward_state"]:
         scalars.update({"value loss": value_loss})
     if reward_loss != {}:
         scalars.update({"reward loss": reward_loss})
-    plot_all(wanted7, played_step, value_mean_datas, action_mean_datas, scalars)
+    # plot_all(wanted7, played_step, value_mean_datas, action_mean_datas, scalars)
 
+plot_all(None, played_step, value_mean_datas, action_mean_datas, scalars)
     # plot_scalar(played_step, test_reward, 'total reward', 0.9)
     # plot_scalar(played_step, params_std, f"{suffix} variance", 0.6)
     # plot_scalar(played_step, value_loss, "value loss", 0.6)

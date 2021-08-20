@@ -22,7 +22,7 @@ class BasicConfig():
         self.num_simulations = 50
         self.reanalyse_num_simulations = 10
         self.target_update_freq = 100
-        self.num_unroll_steps = 10
+        self.num_unroll_steps = 5
         self.td_steps = 5
         self.train_frequency = 100
         self.train_proportion = 0.1

@@ -20,6 +20,7 @@ import shared_storage
 
 class MuZero:
     def __init__(self, game_name, config=None):
+        glog.info(f"this is game: {game_name}")
         # Load the game and the config from the module with the game name
         game_module = importlib.import_module("games." + game_name)
         self.config = game_module.MuZeroConfig()
@@ -67,21 +68,16 @@ class MuZero:
         self.record_worker = None
 
     def init_config(self, game_name, config):
-        if config is not None:
-            for k, v in config.items():
-                if k not in self.config.__dict__.keys():
-                    print(f'unrecognized config k: {k}, v: {v}, ignored')
-                self.config.__dict__[k] = v
-            if self.config.use_priormodel: self.config.priormodel = copy.deepcopy(self.config.hypermodel)
-            if self.config.use_normalization: self.config.normalization = copy.deepcopy(self.config.hypermodel)
-            if self.config.use_target_noise: self.config.target_noise = copy.deepcopy(self.config.hypermodel)
-            if self.config.use_value_target_noise: self.config.target_noise[0] = 1
+        for k, v in config.items():
+            if k not in self.config.__dict__.keys():
+                print(f'unrecognized config k: {k}, v: {v}, ignored')
+            self.config.__dict__[k] = v
+        if self.config.use_priormodel: self.config.priormodel = copy.deepcopy(self.config.hypermodel)
+        if self.config.use_normalization: self.config.normalization = copy.deepcopy(self.config.hypermodel)
+        if self.config.use_target_noise: self.config.target_noise = copy.deepcopy(self.config.hypermodel)
+        if self.config.use_value_target_noise: self.config.target_noise[0] = 1
         if game_name == "deepsea": self.config.observation_shape = (1, 1, self.config.size**2)
         log_path = f"results/{game_name}_{self.config.seed}"
-        # [v, r, s] = self.config.hypermodel
-        # if v == 1: log_path += '_v'
-        # if r == 1: log_path += '_r'
-        # if s == 1: log_path += '_s'
         self.config.game_filename = game_name
         self.config.results_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"{log_path}_{time.strftime('%Y%m%d%H%M%S', time.localtime())}")
 
@@ -177,7 +173,8 @@ class MuZero:
             self.test()
             self.debug()
             self.run_log(episode)
-            self.save_checkpoint(path=f"model{'%03d' % played_games}.checkpoint")
+            if episode % (self.config.total_episode / 10) == 0:
+                self.save_checkpoint(path=f"model{'%03d' % episode}.checkpoint")
             if self.config.record_video:
                 self.record_worker.start_record()
 
@@ -368,7 +365,7 @@ class Actor:
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--game', type=str, default="mountaincar",
+    parser.add_argument('--game', type=str, default="deepsea",
                         help='game name')
     parser.add_argument('--config', type=str, default="{}",
                         help="game config eg., {'seed':0,'PER':False,'train_mode':2,'total_episode':400,'train_frequency':100,'train_proportion':1,'hypermodel':[0,0,1],'use_priormodel':True}")
@@ -381,10 +378,7 @@ def get_args():
 if __name__ == "__main__":
     warnings.filterwarnings('ignore')
     args = get_args()
-    game = args.game
-    config = eval(args.config) if args.config != "none" else None
-    glog.info(f"this is game: {game}")
-    muzero = MuZero(game, config)
+    muzero = MuZero(args.game, eval(args.config))
     if args.ckpt_path:
         muzero.evaluate(args.ckpt_path, args.render)
     else:
