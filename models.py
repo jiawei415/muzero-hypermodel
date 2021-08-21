@@ -61,8 +61,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         if not self.config.use_representation and self.config.stacked_observations == 0:
             encoding_size = self.config.observation_shape[-1]
         else:
-            self.representation_network = torch.nn.DataParallel(
-                mlp(
+            self.representation_network = mlp(
                     observation_shape[0]
                     * observation_shape[1]
                     * observation_shape[2]
@@ -71,7 +70,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
                     fc_representation_layers,
                     encoding_size,
                 )
-            )
+
         if self.state_hyper:
             print(f"use dynamics state hypermodel!")
             layers = [encoding_size + self.action_space_size] + fc_dynamics_layers + [encoding_size]
@@ -84,13 +83,11 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             if self.state_normal:
                 self.init_norm['state'], self.target_norm['state'] = [], []
         else:
-            self.dynamics_encoded_state_network = torch.nn.DataParallel(
-                mlp(
+            self.dynamics_encoded_state_network = mlp(
                     encoding_size + self.action_space_size,
                     fc_dynamics_layers,
                     encoding_size,
                 )
-            )
 
         if self.reward_hyper:
             print(f"use dynamics reward hypermodel!")
@@ -104,13 +101,9 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             if self.reward_normal:
                 self.init_norm['reward'], self.target_norm['reward'] = [], []
         else:
-            self.dynamics_reward_network = torch.nn.DataParallel(
-                mlp(encoding_size, fc_reward_layers, self.full_support_size)
-            )
+            self.dynamics_reward_network =  mlp(encoding_size, fc_reward_layers, self.full_support_size)
 
-        self.prediction_policy_network = torch.nn.DataParallel(
-            mlp(encoding_size, fc_policy_layers, self.action_space_size)
-        )
+        self.prediction_policy_network = mlp(encoding_size, fc_policy_layers, self.action_space_size)
 
         if self.value_hyper:
             print(f"use prediction value hypermodel!")
@@ -124,13 +117,10 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             if self.value_normal:
                 self.init_norm['value'], self.target_norm['value'] = [], []
         else:
-            self.prediction_value_network = torch.nn.DataParallel(
-                mlp(encoding_size, fc_value_layers, self.full_support_size)
-            )
+            self.prediction_value_network = mlp(encoding_size, fc_value_layers, self.full_support_size)
 
     def gen_shape_size(self, layers):
-        shapes = []
-        sizes = []
+        shapes, sizes = [], []
         for i in range(len(layers)-1):
             shapes.extend([(layers[i], layers[i+1]), (1, layers[i+1])])
             sizes.extend([layers[i] * layers[i+1], layers[i+1]])
