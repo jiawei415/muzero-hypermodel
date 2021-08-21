@@ -74,7 +74,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         if self.state_hyper:
             print(f"use dynamics state hypermodel!")
             sizes = [encoding_size + self.action_space_size] + fc_dynamics_layers + [encoding_size]
-            base_model_sizes, hyper_model_sizes = sizes[:-1], sizes[-2:]
+            base_model_sizes, hyper_model_sizes = (sizes[:-1], sizes[-2:]) if config.use_last_layer else ([], sizes)
             self.state_base_model = self.gen_base_model(base_model_sizes)
             self.state_shapes, self.state_sizes = self.gen_shape_size(hyper_model_sizes)
             state_params_inp_dim = config.hyper_inp_dim
@@ -94,7 +94,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         if self.reward_hyper:
             print(f"use dynamics reward hypermodel!")
             sizes = [encoding_size] + fc_reward_layers + [self.full_support_size]
-            base_model_sizes, hyper_model_sizes = sizes[:-1], sizes[-2:]
+            base_model_sizes, hyper_model_sizes = (sizes[:-1], sizes[-2:] )if config.use_last_layer else ([], sizes)
             self.reward_base_model = self.gen_base_model(base_model_sizes)
             self.reward_shapes, self.reward_sizes = self.gen_shape_size(hyper_model_sizes)
             reward_params_inp_dim = config.hyper_inp_dim
@@ -112,7 +112,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         if self.value_hyper:
             print(f"use prediction value hypermodel!")
             sizes = [encoding_size] + fc_value_layers + [self.full_support_size]
-            base_model_sizes, hyper_model_sizes = sizes[:-1], sizes[-2:]
+            base_model_sizes, hyper_model_sizes = (sizes[:-1], sizes[-2:]) if config.use_last_layer else ([], sizes)
             self.value_base_model = self.gen_base_model(base_model_sizes)
             self.value_shapes, self.value_sizes = self.gen_shape_size(hyper_model_sizes)
             value_params_inp_dim = config.hyper_inp_dim

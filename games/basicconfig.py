@@ -12,6 +12,7 @@ class BasicConfig():
         self.use_target_noise = False
         self.use_reg_loss = False
         self.use_value_target_noise = False
+        self.use_last_layer = False
         
         # Based Config
         self.reg_loss_coef = 1e-4
