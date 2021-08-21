@@ -56,6 +56,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         self.value_hyper, self.reward_hyper, self.state_hyper = config.hypermodel
         self.value_normal, self.reward_normal, self.state_normal = config.normalization
         self.init_norm, self.target_norm, self.prior_model = {}, {}, {}
+        self.splited_shapes, self.splited_sizes = {}, {}
         self.config = config
 
         if not self.config.use_representation and self.config.stacked_observations == 0:
@@ -76,9 +77,9 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             sizes = [encoding_size + self.action_space_size] + fc_dynamics_layers + [encoding_size]
             base_model_sizes, hyper_model_sizes = (sizes[:-1], sizes[-2:]) if config.use_last_layer else ([], sizes)
             self.state_base_model = self.gen_base_model(base_model_sizes)
-            self.state_shapes, self.state_sizes = self.gen_shape_size(hyper_model_sizes)
+            self.splited_shapes['state'], self.splited_sizes['state'] = self.gen_shape_size(hyper_model_sizes)
             state_params_inp_dim = config.hyper_inp_dim
-            state_params_out_dim = sum(self.state_sizes)
+            state_params_out_dim = sum(self.splited_sizes['state'])
             self.state_hyper_model = torch.nn.Linear(state_params_inp_dim, state_params_out_dim)
             if self.state_prior:
                 self.prior_model['state'] = self.gen_prior_model(state_params_inp_dim, state_params_out_dim)
@@ -96,9 +97,9 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             sizes = [encoding_size] + fc_reward_layers + [self.full_support_size]
             base_model_sizes, hyper_model_sizes = (sizes[:-1], sizes[-2:] )if config.use_last_layer else ([], sizes)
             self.reward_base_model = self.gen_base_model(base_model_sizes)
-            self.reward_shapes, self.reward_sizes = self.gen_shape_size(hyper_model_sizes)
+            self.splited_shapes['reward'], self.splited_sizes['reward'] = self.gen_shape_size(hyper_model_sizes)
             reward_params_inp_dim = config.hyper_inp_dim
-            reward_params_out_dim = sum(self.reward_sizes)
+            reward_params_out_dim = sum(self.splited_sizes['reward'])
             self.reward_hyper_model = torch.nn.Linear(reward_params_inp_dim, reward_params_out_dim)
             if self.reward_prior:
                 self.prior_model['reward'] = self.gen_prior_model(reward_params_inp_dim, reward_params_out_dim)
@@ -114,9 +115,9 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             sizes = [encoding_size] + fc_value_layers + [self.full_support_size]
             base_model_sizes, hyper_model_sizes = (sizes[:-1], sizes[-2:]) if config.use_last_layer else ([], sizes)
             self.value_base_model = self.gen_base_model(base_model_sizes)
-            self.value_shapes, self.value_sizes = self.gen_shape_size(hyper_model_sizes)
+            self.splited_shapes['value'], self.splited_sizes['value'] = self.gen_shape_size(hyper_model_sizes)
             value_params_inp_dim = config.hyper_inp_dim
-            value_params_out_dim = sum(self.value_sizes)
+            value_params_out_dim = sum(self.splited_sizes['value'])
             self.value_hyper_model = torch.nn.Linear(value_params_inp_dim, value_params_out_dim)
             if self.value_prior:
                 self.prior_model['value'] = self.gen_prior_model(value_params_inp_dim, value_params_out_dim)
@@ -279,15 +280,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         return value, reward, policy_logits, next_encoded_state, value_params, state_params, reward_params
 
     def split_params(self, params, hyper_type):
-        if hyper_type == "reward":
-            sizes = self.reward_sizes
-            shapes = self.reward_shapes
-        elif hyper_type == "state":
-            sizes = self.state_sizes
-            shapes = self.state_shapes
-        elif hyper_type == "value":
-            sizes = self.value_sizes
-            shapes = self.value_shapes
+        shapes, sizes = self.splited_shapes[hyper_type], self.splited_sizes[hyper_type]
         params = params.split(sizes, dim=1)
         params_splited = []
         for param, shape in zip(params, shapes):
