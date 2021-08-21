@@ -4,7 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from tensorboard.backend.event_processing import event_accumulator
 
-played_step, training_step = {}, {}
+played_step, training_step, configs = {}, {}, {}
 test_reward, value_params_std, reward_params_std, state_params_std = {}, {}, {}, {}
 total_loss, value_loss, reward_loss, policy_loss = {}, {}, {}, {}
 mcts_action_0, mcts_action_1, mcts_action_2 = {}, {}, {}
@@ -68,7 +68,7 @@ def gen_ydata(ys, min_len, weight):
 
 game_name = "deepsea"
 action_num = 2
-time_tag = "2021081806"
+time_tag = "2021082003"
 log_path = f"./results/{game_name}/{time_tag}"
 labels = {"+hyper": "hypermodel", "+prior": "priormodel", "+normal": "normalization", "+target": "target_noise", "+reg": "use_reg_loss"}
 
@@ -81,11 +81,7 @@ for root, dirs, files in os.walk(log_path):
         files = sorted(files)
         label = "muzero"
         config = pd.read_csv(os.path.join(root, files[0]), sep="\t")
-        seed = config[config.key == "seed"].value.to_list()[0]
-        td_steps = config[config.key == "td_steps"].value.to_list()[0]
-        value_loss_weight = config[config.key == "value_loss_weight"].value.to_list()[0]
-        # label += f"_{seed}"
-        # label += "_p" if eval(config[config.key == "PER"].value.to_list()[0]) else "_np"
+        label += "_p" if eval(config[config.key == "PER"].value.to_list()[0]) else "_np"
         v, r, s = eval(config[config.key == "hypermodel"].value.to_list()[0])
         if v == 1: label += '_value'
         if r == 1: label += '_reward'
@@ -94,7 +90,13 @@ for root, dirs, files in os.walk(log_path):
             conf = eval(config[config.key == v].value.to_list()[0])
             if (isinstance(conf, list) and 1 in conf) or (isinstance(conf, bool) and conf):
                 label += k
-        label += f"_{td_steps}_{value_loss_weight}"
+        seed = config[config.key == "seed"].value.to_list()[0]
+        td_steps = config[config.key == "td_steps"].value.to_list()[0]
+        value_loss_weight = config[config.key == "value_loss_weight"].value.to_list()[0]
+        num_unroll_steps = config[config.key == "num_unroll_steps"].value.to_list()[0]
+        support_size = config[config.key == "support_size"].value.to_list()[0]
+        title = f"td_steps: {td_steps} value_loss_weight: {value_loss_weight} num_unroll_steps: {num_unroll_steps} support_size: {support_size}"
+        configs[label] = title
         debug_logs = pd.read_csv(os.path.join(root, files[1]), sep="\t")
         player_logs = pd.read_csv(os.path.join(root, files[-1]), sep="\t")
         for k, v in player_datas.items():
@@ -217,14 +219,17 @@ def plot_distribution(xs, ys, ylabel, weight=0.6, plot_mean=True):
             # plt.savefig(f"./figures/{game_name}_{label}")
             plt.show()
 
-def plot_all(wanted, xs, value, action, scalar):
+def plot_all(wanted, xs, value, action, scalar, title=None):
     weight = 0.8
     # for i, label in enumerate(wanted):
     #     if label not in xs.keys():
     #         continue
     for label in xs.keys():
         fig, axes = plt.subplots(len(scalar) + 2, 1, figsize=(20, 30))
-        fig.suptitle(f"{game_name}_{label}")
+        if title is not None:
+            fig.suptitle(f"{game_name}_{label} \n\n {title[label]}")
+        else:
+            fig.suptitle(f"{game_name}_{label}")
         min_len = min([len(x) for x in xs[label]])
         x = xs[label][0][:min_len]
         for i, (value_name, value_data) in enumerate(value.items()):
@@ -265,11 +270,11 @@ COLORS = ['darkgreen', 'darkred', 'lightblue', 'green', 'red','blue', 'orange', 
           'brown', 'orange', 'teal', 'lightblue', 'lime', 'lavender', 'tan']
 
 wanted1 = ['muzero_p', 'muzero_np']
-scalars = {"total reward": test_reward}
-if value_loss != {}:
-    scalars.update({"value loss": value_loss})
-if reward_loss != {}:
-    scalars.update({"reward loss": reward_loss})
+# scalars = {"total reward": test_reward}
+# if value_loss != {}:
+#     scalars.update({"value loss": value_loss})
+# if reward_loss != {}:
+#     scalars.update({"reward loss": reward_loss})
 # plot_all(wanted1, played_step, value_mean_datas, action_mean_datas, scalars)
 
 # for suffix in ["p_value", "p_reward", "p_state", "np_value", "np_reward", "np_state"]:
@@ -294,7 +299,6 @@ for suffix in ["np_reward", "np_state", "np_reward_state"]:
         scalars.update({"reward loss": reward_loss})
     # plot_all(wanted7, played_step, value_mean_datas, action_mean_datas, scalars)
 
-plot_all(None, played_step, value_mean_datas, action_mean_datas, scalars)
     # plot_scalar(played_step, test_reward, 'total reward', 0.9)
     # plot_scalar(played_step, params_std, f"{suffix} variance", 0.6)
     # plot_scalar(played_step, value_loss, "value loss", 0.6)
@@ -307,3 +311,5 @@ plot_all(None, played_step, value_mean_datas, action_mean_datas, scalars)
     # plot_distribution(played_step, test_reward, "total reward", 0.9, False)
     # plot_distribution(played_step, params_std, f"{suffix} variance", 0.6, False)
     # plot_distribution(played_step, value_loss, "value loss", 0.6, False)
+
+plot_all(None, played_step, value_mean_datas, action_mean_datas, scalars, configs)
