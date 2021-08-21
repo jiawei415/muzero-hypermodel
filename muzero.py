@@ -34,7 +34,7 @@ class MuZero:
             "optimizer_state": None,
             "init_norm": None,
             "target_norm": None,
-            "prior_params": None,
+            "prior_model": None,
             "train_total_reward": 0,
             "train_episode_length": 0,
             "train_mean_value": 0,
@@ -302,7 +302,7 @@ class MuZero:
                 ),
                 "init_norm": copy.deepcopy(self.model.init_norm),
                 "target_norm": copy.deepcopy(self.model.target_norm),
-                "prior_params": copy.deepcopy(self.model.prior_params),
+                "prior_model": copy.deepcopy(self.model.prior_model),
             }
         )
         if self.config.save_model:
@@ -313,7 +313,7 @@ class MuZero:
         self.model.set_weights(self.checkpoint["weights"])
         self.model.init_norm = self.checkpoint["init_norm"]
         self.model.target_norm = self.checkpoint["target_norm"]
-        self.model.prior_params = self.checkpoint["prior_params"]
+        self.model.prior_model = self.checkpoint["prior_model"]
         self.record_worker = self_play.RecordPlay(self.model, self.config)
         total_reward = self.record_worker.start_record(render=render)
         print(f"total reward: {total_reward}")
@@ -328,11 +328,11 @@ class Actor:
         target_model = models.MuZeroNetwork(self.config).to(device)
         weigths = model.get_weights()
         summary = str(model).replace("\n", " \n\n")
-        print(f"model \n : {str(model)}")
+        print(f"{str(model)}")
         target_model.set_weights(weigths)
         target_model.init_norm = model.init_norm
         target_model.target_norm = model.target_norm
-        target_model.prior_params = model.prior_params
+        target_model.prior_model = model.prior_model
         if "cuda" not in str(next(model.parameters()).device):
             print("You are not training on GPU.\n")
         return model, target_model, weigths, summary
