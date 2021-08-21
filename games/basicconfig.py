@@ -27,7 +27,7 @@ class BasicConfig():
         self.train_frequency = 100
         self.train_proportion = 0.1
         self.start_train = 1
-        self.train_mode = 1
+        self.train_mode = 2
         self.total_episode = 100
         self.seed = 0
 
@@ -88,7 +88,7 @@ class BasicConfig():
 
         ### Replay Buffer
         self.replay_buffer_size = 500  # Number of self-play games to keep in the replay buffer
-        self.PER = True  # Prioritized Replay (See paper appendix Training), select in priority the elements in the replay buffer which are unexpected for the network
+        self.PER = False  # Prioritized Replay (See paper appendix Training), select in priority the elements in the replay buffer which are unexpected for the network
         self.PER_alpha = 0.5  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
 
         # Reanalyze (See paper appendix Reanalyse)

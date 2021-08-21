@@ -328,6 +328,7 @@ class Actor:
         target_model = models.MuZeroNetwork(self.config).to(device)
         weigths = model.get_weights()
         summary = str(model).replace("\n", " \n\n")
+        print(f"model \n : {str(model)}")
         target_model.set_weights(weigths)
         target_model.init_norm = model.init_norm
         target_model.target_norm = model.target_norm
@@ -368,7 +369,7 @@ def get_args():
     parser.add_argument('--game', type=str, default="deepsea",
                         help='game name')
     parser.add_argument('--config', type=str, default="{}",
-                        help="game config eg., {'seed':0,'PER':False,'train_mode':2,'total_episode':400,'train_frequency':100,'train_proportion':1,'hypermodel':[0,0,1],'use_priormodel':True}")
+                        help="game config eg., {'seed':0,'total_episode':600,'train_frequency':50,'train_proportion':3,'hypermodel':[0,0,1],'use_priormodel':True,'td_steps':5,'value_loss_weight':0.25,'num_unroll_steps':10,'support_size':10}")
     parser.add_argument('--ckpt-path', type=str, default="",
                         help="checkpoint path for evaluation")
     parser.add_argument('--render', default=False, action='store_true')
