@@ -68,7 +68,7 @@ def gen_ydata(ys, min_len, weight):
 
 game_name = "deepsea"
 action_num = 2
-time_tag = "2021082003"
+time_tag = "2021081808"
 log_path = f"./results/{game_name}/{time_tag}"
 labels = {"+hyper": "hypermodel", "+prior": "priormodel", "+normal": "normalization", "+target": "target_noise", "+reg": "use_reg_loss"}
 
@@ -95,7 +95,8 @@ for root, dirs, files in os.walk(log_path):
         value_loss_weight = config[config.key == "value_loss_weight"].value.to_list()[0]
         num_unroll_steps = config[config.key == "num_unroll_steps"].value.to_list()[0]
         support_size = config[config.key == "support_size"].value.to_list()[0]
-        title = f"td_steps: {td_steps} value_loss_weight: {value_loss_weight} num_unroll_steps: {num_unroll_steps} support_size: {support_size}"
+        use_last_layer = config[config.key == "use_last_layer"].value.to_list()[0] if "use_last_layer" in config['key'].values else False
+        title = f"td_steps: {td_steps} value_loss_weight: {value_loss_weight} num_unroll_steps: {num_unroll_steps} support_size: {support_size} use_last_layer: {use_last_layer}"
         configs[label] = title
         debug_logs = pd.read_csv(os.path.join(root, files[1]), sep="\t")
         player_logs = pd.read_csv(os.path.join(root, files[-1]), sep="\t")
