@@ -151,7 +151,7 @@ class MuZero:
                         if training_steps % self.config.checkpoint_interval == 0:
                             self.save_checkpoint()
                         index_batch, batch = self.replay_buffer_worker.get_batch()
-                        priorities, losses = self.training_worker.train_game(batch, training_steps)
+                        priorities, losses = self.training_worker.train_game(batch, training_steps, played_steps)
                         if self.config.PER:
                             self.replay_buffer_worker.update_priorities(priorities, index_batch)
                         training_steps += 1

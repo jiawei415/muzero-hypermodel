@@ -113,6 +113,9 @@ class BasicConfig():
         else:
             return 0.25
 
+    def regularization_coef(self, played_steps):
+        return self.reg_loss_coef / played_steps
+
     def train_times(self, played_games):
         if played_games <= 10:
             return 100 # 200 if self.use_reanalyse else 100

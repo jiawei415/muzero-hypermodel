@@ -19,16 +19,16 @@ class Trainer:
         self.optimizer = optimizer
         self.writer = writer
         
-    def train_game(self, batch, training_step):
+    def train_game(self, batch, training_step, played_steps):
         if training_step % self.config.target_update_freq == 0:
             # print(f"update target model")
             self.target_model.load_state_dict(self.model.state_dict())
         self.model.train()
         self.update_lr(training_step)
-        priorities, losses = self.update_weights(batch)  
+        priorities, losses = self.update_weights(batch, played_steps)
         return priorities, losses
 
-    def update_weights(self, batch):
+    def update_weights(self, batch, played_steps):
         """
         Perform one training step.
         """
@@ -149,7 +149,7 @@ class Trainer:
         loss = value_loss * self.config.value_loss_weight + reward_loss + policy_loss
         if self.config.use_reg_loss:
             reg_loss = self.regularization_loss([value_params, reward_params, state_params])
-            loss += self.config.reg_loss_coef * reg_loss
+            loss += self.config.regularization_coef(played_steps) * reg_loss
         if self.config.PER:
             # Correct PER bias by using importance-sampling (IS) weights
             loss *= weight_batch
