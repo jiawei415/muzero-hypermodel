@@ -15,7 +15,7 @@ class BasicConfig():
         self.use_last_layer = False
         
         # Based Config
-        self.reg_loss_coef = 1e-4
+        self.reg_loss_scale = 0.1
         self.prior_model_std = 1
         self.normal_noise_std = 1
         self.target_noise_std = 0.1
@@ -114,7 +114,7 @@ class BasicConfig():
             return 0.25
 
     def regularization_coef(self, played_steps):
-        return self.reg_loss_coef / played_steps
+        return self.reg_loss_scale / (self.prior_model_std**2 * played_steps)
 
     def train_times(self, played_games):
         if played_games <= 10:

@@ -71,6 +71,7 @@ class MuZero:
         for k, v in config.items():
             if k not in self.config.__dict__.keys():
                 print(f'unrecognized config k: {k}, v: {v}, ignored')
+                continue
             self.config.__dict__[k] = v
         if self.config.use_priormodel: self.config.priormodel = copy.deepcopy(self.config.hypermodel)
         if self.config.use_normalization: self.config.normalization = copy.deepcopy(self.config.hypermodel)
