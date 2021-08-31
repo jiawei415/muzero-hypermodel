@@ -1,4 +1,5 @@
 import os
+import sys
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -66,9 +67,12 @@ def gen_ydata(ys, min_len, weight):
     y = smooth(np.mean(y_matrix, axis=0), weight)
     return y, y_min, y_max
 
+try:
+    time_tag = f"2021{sys.argv[1]}"
+except:
+    time_tag = "2021083101"
 game_name = "deepsea"
 action_num = 2
-time_tag = "2021083002"
 log_path = f"./results/{game_name}/{time_tag}"
 titles = {"+hyper": "hypermodel", "+prior": "priormodel", "+normal": "normalization", "+target": "target_noise", "+reg": "use_reg_loss"}
 
