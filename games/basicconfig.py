@@ -33,6 +33,7 @@ class BasicConfig():
         self.seed = 0
 
         ### Game
+        self.size = 50
         self.use_reward_wrapper = False
         self.use_custom_env = True
         self.fix_init_state = False

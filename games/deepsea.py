@@ -10,7 +10,6 @@ class MuZeroConfig(BasicConfig):
     def __init__(self):
         super(MuZeroConfig, self).__init__()
         ### Game
-        self.size = 50
         self.observation_shape = (1, 1, self.size**2)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
         self.action_space = list(range(2))  # Fixed list of all possible actions. You should only edit the length
         
