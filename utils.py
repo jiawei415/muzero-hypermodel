@@ -85,7 +85,8 @@ class MCTS:
 
             while node.expanded():
                 current_tree_depth += 1
-                action, node = self.select_child(node, min_max_stats)
+                # action, node = self.select_child(node, min_max_stats)
+                action, node = search_action(node, min_max_stats, self.config)
                 search_path.append(node)
 
                 # Players play turn by turn
@@ -389,3 +390,60 @@ def scalar_to_support(x, support_size):
     indexes = indexes.masked_fill_(2 * support_size < indexes, 0.0)
     logits.scatter_(2, indexes.long().unsqueeze(-1), prob.unsqueeze(-1))
     return logits
+
+
+def gen_new_pi(sum_visit_count, pi, Q, config):
+    lambda_N = config.pb_c_init * math.sqrt(sum_visit_count) / (len(pi) + sum_visit_count)
+    alpha_min = max(Q + lambda_N * pi)
+    alpha_max = max(Q + lambda_N)
+    alpha = (alpha_min + alpha_max) / 2
+    new_pi = lambda_N * pi / (alpha - Q)
+    sum_new_pi = sum(new_pi)
+    while abs(sum_new_pi - 1) > config.eps:
+        if sum_new_pi < 1:
+            alpha_max = alpha
+        else:
+            alpha_min = alpha
+        alpha = (alpha_min + alpha_max) / 2
+        new_pi = lambda_N * pi / (alpha - Q)
+        sum_new_pi = sum(new_pi)
+    return new_pi
+
+
+def search_action(node, min_max_stats, config):
+    sum_visit_count = 0
+    pi, Q = numpy.zeros(len(node.children)), numpy.zeros(len(node.children))
+    for i, child in enumerate(node.children.values()):
+        sum_visit_count += child.visit_count
+        if child.visit_count > 0:
+            pi[i], Q[i] = child.prior, min_max_stats.normalize(child.reward + config.discount * child.value())
+        else:
+            pi[i], Q[i] = child.prior, 0
+    if sum_visit_count == 0:
+        action = numpy.random.choice(config.action_space)
+        return action, node.children[action]
+    new_pi = gen_new_pi(sum_visit_count, pi, Q, config)
+    p = new_pi / sum(new_pi)
+    action = numpy.random.choice(config.action_space, p=p)
+    return action, node.children[action]
+
+
+def play_action(node, temperature, config):
+    if temperature == float("inf"):
+        return numpy.random.choice(config.action_space)
+    sum_visit_count = 0
+    pi, Q = numpy.zeros(len(node.children)), numpy.zeros(len(node.children))
+    for i, child in enumerate(node.children.values()):
+        sum_visit_count += child.visit_count
+        if child.visit_count > 0:
+            pi[i], Q[i] = child.prior, child.reward + config.discount * child.value()
+        else:
+            pi[i], Q[i] = child.prior, 0
+    new_pi = gen_new_pi(sum_visit_count, pi, Q, config)
+    if temperature == 0:
+        action = config.action_space[numpy.argmax(new_pi)]
+    else:
+        new_pi = new_pi ** (1 / temperature)
+        p = new_pi / sum(new_pi)
+        action = numpy.random.choice(config.action_space, p=p)
+    return action
