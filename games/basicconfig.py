@@ -79,7 +79,8 @@ class BasicConfig():
         self.checkpoint_interval = 100  # Number of training steps before using the model for self-playing
         self.value_loss_weight = 1  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
         self.optimizer = "Adam"  # "Adam" or "SGD". Paper uses SGD
-        self.weight_decay = 1e-4  # L2 weights regularization
+        self.base_weight_decay = 1e-4  # L2 weights regularization
+        self.hyper_weight_decay = 1e-4
         self.momentum = 0.9  # Used only if optimizer is SGD
 
         # Exponential learning rate schedule

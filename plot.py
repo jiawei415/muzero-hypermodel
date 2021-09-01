@@ -66,6 +66,7 @@ def gen_ydata(ys, min_len, weight):
     y_max= smooth(np.max(y_matrix, axis=0), weight)
     y = smooth(np.mean(y_matrix, axis=0), weight)
     return y, y_min, y_max
+
 try:
     time_tag = f"2021{sys.argv[1]}"
 except:
@@ -99,7 +100,8 @@ for root, dirs, files in os.walk(log_path):
         support_size = config[config.key == "support_size"].value.to_list()[0]
         use_last_layer = config[config.key == "use_last_layer"].value.to_list()[0] if "use_last_layer" in config['key'].values else False
         prior_model_std = config[config.key == "prior_model_std"].value.to_list()[0]
-        label = title + f"\t td_steps: {td_steps} value_loss_weight: {value_loss_weight} num_unroll_steps: {num_unroll_steps} support_size: {support_size} use_last_layer: {use_last_layer} prior_model_std: {prior_model_std}"
+        base_weight_decay = config[config.key == "base_weight_decay"].value.to_list()[0]
+        label = title + f"\t td_steps: {td_steps} value_loss_weight: {value_loss_weight} num_unroll_steps: {num_unroll_steps} support_size: {support_size} use_last_layer: {use_last_layer} prior_model_std: {prior_model_std} base_weight_decay: {base_weight_decay}"
         debug_logs = pd.read_csv(os.path.join(root, 'debug_logs.csv'), sep="\t")
         player_logs = pd.read_csv(os.path.join(root, 'palyer_logs.csv'), sep="\t")
         for k, v in player_datas.items():
