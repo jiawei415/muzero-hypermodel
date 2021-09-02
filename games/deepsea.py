@@ -10,6 +10,10 @@ class MuZeroConfig(BasicConfig):
     def __init__(self):
         super(MuZeroConfig, self).__init__()
         ### Game
+        self.size = 50
+        self.deterministic = True
+        self.use_move_cost = True
+        self.unscaled_move_cost = 0.01
         self.observation_shape = (1, 1, self.size**2)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
         self.action_space = list(range(2))  # Fixed list of all possible actions. You should only edit the length
         
@@ -75,7 +79,6 @@ class Game(AbstractGame):
         Display the game observation.
         """
         self.env.render()
-        input("Press enter to take a step ")
 
     def action_to_string(self, action_number):
         """
@@ -101,19 +104,19 @@ class DeepSeaEnv(gym.Env):
     [1] https://arxiv.org/abs/1703.07608
     [2] https://arxiv.org/abs/1806.03335
     """
-    def __init__(self, config, deterministic=True, unscaled_move_cost=0.01):
+    def __init__(self, config):
         super().__init__()
         self.config = config
         self._size = config.size
-        self._deterministic = deterministic # config.get("deterministic", True)
+        self._deterministic = config.deterministic
         self.observation_space = spaces.Box(low=0, high=1, shape=(self._size, self._size), dtype=np.int32)
         self.action_space = spaces.Discrete(n=2)
 
         self._row = 0
         self._column = 0
-        self._unscaled_move_cost = unscaled_move_cost # config.get("move_cost", 0.01)
+        self._unscaled_move_cost = config.unscaled_move_cost
         self._action_mapping = np.ones([self._size, self._size])
-        self.use_move_cost = True
+        self.use_move_cost = config.use_move_cost
 
         assert self._unscaled_move_cost * self._size <= 1, (
             "Please decrease the move cost. Otherwise the optimal decision is not go right."
