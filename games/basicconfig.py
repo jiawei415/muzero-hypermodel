@@ -12,28 +12,27 @@ class BasicConfig():
         self.use_target_noise = False
         self.use_reg_loss = False
         self.use_value_target_noise = False
-        self.use_last_layer = False
+        self.use_last_layer = True
         
         # Based Config
-        self.reg_loss_scale = 0.1
+        self.reg_loss_scale = 0.001
         self.prior_model_std = 1
         self.normal_noise_std = 1
         self.target_noise_std = 0.1
         self.hyper_inp_dim = 32
-        self.num_simulations = 10
-        self.reanalyse_num_simulations = 5
+        self.num_simulations = 50
+        self.reanalyse_num_simulations = 10
         self.target_update_freq = 100
         self.num_unroll_steps = 10
         self.td_steps = 5
         self.train_frequency = 100
-        self.train_proportion = 0.1
+        self.train_proportion = 3
         self.start_train = 1
         self.train_mode = 2
         self.total_episode = 100
         self.seed = 0
 
         ### Game
-        self.size = 50
         self.use_reward_wrapper = False
         self.use_custom_env = True
         self.fix_init_state = False
@@ -68,7 +67,6 @@ class BasicConfig():
         # UCB formula
         self.pb_c_base = 19652
         self.pb_c_init = 1.25
-        self.eps = 1e-3
 
         ### Network
         self.network = "fullyconnected"  # "resnet" / "fullyconnected"

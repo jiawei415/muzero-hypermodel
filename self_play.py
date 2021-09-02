@@ -61,14 +61,7 @@ class SelfPlay:
             #     or len(game_history.action_history) < temperature_threshold
             #     else 0,
             # )
-            action = play_action(
-                root,
-                temperature
-                if not temperature_threshold
-                or len(game_history.action_history) < temperature_threshold
-                else 0,
-                self.config,
-            )
+            action = play_action(root, temperature if not temperature_threshold or len(game_history.action_history) < temperature_threshold else 0, self.config)
             observation, reward, done = self.game.step(action)
 
             game_history.store_search_statistics(root, self.config.action_space)
