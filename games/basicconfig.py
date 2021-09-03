@@ -67,6 +67,7 @@ class BasicConfig():
         # UCB formula
         self.pb_c_base = 19652
         self.pb_c_init = 1.25
+        self.eps = 0.001
 
         ### Network
         self.network = "fullyconnected"  # "resnet" / "fullyconnected"

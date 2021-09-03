@@ -104,7 +104,8 @@ for root, dirs, files in os.walk(log_path):
         label = title + f"\t td_steps: {td_steps} value_loss_weight: {value_loss_weight} num_unroll_steps: {num_unroll_steps} support_size: {support_size} use_last_layer: {use_last_layer} prior_model_std: {prior_model_std} base_weight_decay: {base_weight_decay}"
         if game_name == "deepsea":
             size = config[config.key == "size"].value.to_list()[0]
-            label += f" size: {size}"
+            deterministic = config[config.key == "deterministic"].value.to_list()[0] if "deterministic" in config['key'].values else True
+            label += f" size: {size} deterministic: {deterministic}"
         debug_logs = pd.read_csv(os.path.join(root, 'debug_logs.csv'), sep="\t")
         player_logs = pd.read_csv(os.path.join(root, 'palyer_logs.csv'), sep="\t")
         for k, v in player_datas.items():
