@@ -1,4 +1,5 @@
 import gym
+import warnings
 import numpy as np
 from gym import spaces
 from gym.utils import seeding
@@ -10,9 +11,10 @@ class MuZeroConfig(BasicConfig):
     def __init__(self):
         super(MuZeroConfig, self).__init__()
         ### Game
-        self.size = 50
+        self.size = 5
         self.deterministic = True
         self.use_move_cost = True
+        self.randomize_actions = True
         self.unscaled_move_cost = 0.01
         self.observation_shape = (1, 1, self.size**2)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
         self.action_space = list(range(2))  # Fixed list of all possible actions. You should only edit the length
@@ -109,14 +111,22 @@ class DeepSeaEnv(gym.Env):
         self.config = config
         self._size = config.size
         self._deterministic = config.deterministic
-        self.observation_space = spaces.Box(low=0, high=1, shape=(self._size, self._size), dtype=np.int32)
-        self.action_space = spaces.Discrete(n=2)
+        self._use_move_cost = config.use_move_cost
+        self._unscaled_move_cost = config.unscaled_move_cost
+
+        if config.randomize_actions:
+            self._mapping_rng = np.random.RandomState(config.seed)
+            self._action_mapping = self._mapping_rng.binomial(1, 0.5, [config.size, config.size])
+        else:
+            warnings.warn('Environment is in debug mode (randomize_actions=False).'
+                            'Only randomized_actions=True is the DeepSea environment.')
+            self._action_mapping = np.ones([config.size, config.size])
 
         self._row = 0
         self._column = 0
-        self._unscaled_move_cost = config.unscaled_move_cost
-        self._action_mapping = np.ones([self._size, self._size])
-        self.use_move_cost = config.use_move_cost
+
+        self.observation_space = spaces.Box(low=0, high=1, shape=(self._size, self._size), dtype=np.int32)
+        self.action_space = spaces.Discrete(n=2)
 
         assert self._unscaled_move_cost * self._size <= 1, (
             "Please decrease the move cost. Otherwise the optimal decision is not go right."
@@ -140,7 +150,7 @@ class DeepSeaEnv(gym.Env):
 
     def step(self, action: int):
         reward = 0. if self.config.use_reward_wrapper else -1.
-        action_right = action == 1 # self._action_mapping[self._row, self._column]
+        action_right = action == self._action_mapping[self._row, self._column]
 
         # Reward calculation
         if self._column == self._size - 1 and action_right:
@@ -152,7 +162,7 @@ class DeepSeaEnv(gym.Env):
         if action_right:
             if np.random.rand() > 1 / self._size or self._deterministic:
                 self._column = np.clip(self._column + 1, 0, self._size - 1)
-            if self.use_move_cost:
+            if self._use_move_cost:
                 reward -= self._unscaled_move_cost / self._size
         else:
             # You were on the right path and went wrong
