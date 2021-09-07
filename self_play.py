@@ -1,14 +1,11 @@
 import numpy
 import torch
-import importlib
 from utils import MCTS, GameHistory
 
 class SelfPlay:
-    def __init__(self, model, config):
+    def __init__(self, model, game, config):
         self.config = config
-        game_module = importlib.import_module("games." + self.config.game_filename)
-        Game = game_module.Game
-        self.game = Game(config)
+        self.game = game
         self.use_value_noise, self.use_reward_noise, _ = config.target_noise
         # Fix random generator seed
         numpy.random.seed(self.config.seed)
@@ -109,11 +106,9 @@ class SelfPlay:
 
 
 class TestPlay:
-    def __init__(self, model, config):
+    def __init__(self, model, game, config):
         self.config = config
-        game_module = importlib.import_module("games." + self.config.game_filename)
-        Game = game_module.Game
-        self.game = Game(config)
+        self.game = game
         self.model = model
         self.noise_dim = int(self.config.hyper_inp_dim)
         self.fix_noise = torch.normal(0, 1, [1, self.noise_dim]) * self.config.normal_noise_std  
@@ -190,11 +185,9 @@ class TestPlay:
 
 
 class RecordPlay:
-    def __init__(self, model, config):
+    def __init__(self, model, game, config):
         self.config = config
-        game_module = importlib.import_module("games." + self.config.game_filename)
-        Game = game_module.Game
-        self.game = Game(config, record_video=self.config.record_video)
+        self.game = game
         self.model = model
         self.noise_dim = int(self.config.hyper_inp_dim)
 

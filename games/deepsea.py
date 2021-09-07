@@ -11,7 +11,7 @@ class MuZeroConfig(BasicConfig):
     def __init__(self):
         super(MuZeroConfig, self).__init__()
         ### Game
-        self.size = 5
+        self.size = 20
         self.deterministic = True
         self.use_move_cost = True
         self.randomize_actions = True

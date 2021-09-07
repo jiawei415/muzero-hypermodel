@@ -20,14 +20,14 @@ class Game(AbstractGame):
     Game wrapper.
     """
 
-    def __init__(self, config, record_video=False):
+    def __init__(self, config):
         if config.use_custom_env:
             self.env = MountainCar(config)
         else:
             self.env = gym.make("MountainCar-v0")
         if config.seed is not None:
             self.env.seed(config.seed)
-        if record_video:
+        if config.record_video:
             record_frequency = config.record_frequency
             video_callable = lambda episode: episode % record_frequency == 0
             self.env = TimeLimit(self.env, max_episode_steps=500)

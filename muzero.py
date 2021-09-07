@@ -23,11 +23,13 @@ class MuZero:
         glog.info(f"this is game: {game_name}")
         # Load the game and the config from the module with the game name
         game_module = importlib.import_module("games." + game_name)
+        Game = game_module.Game
         self.config = game_module.MuZeroConfig()
         self.init_config(game_name, config)
         # Fix random generator seed
         numpy.random.seed(self.config.seed)
         torch.manual_seed(self.config.seed)
+        self.game = Game(self.config)
         # Checkpoint and replay buffer used to initialize workers
         self.checkpoint = {
             "weights": None,
@@ -123,11 +125,11 @@ class MuZero:
         self.reanalyse_worker = replay_buffer.Reanalyse(self.target_model, self.config)
         self.replay_buffer_worker = replay_buffer.ReplayBuffer(self.reanalyse_worker, self.config)
         self.training_worker = trainer.Trainer(self.model, self.target_model, self.optimizer, self.config, self.writer)
-        self.self_play_worker = self_play.SelfPlay(self.model, self.config)
-        self.test_worker = self_play.TestPlay(self.model, self.config)
+        self.self_play_worker = self_play.SelfPlay(self.model, self.game, self.config)
+        self.test_worker = self_play.TestPlay(self.model, self.game, self.config)
         self.debug_worker = debug.Debug(self.model, self.target_model, self.config, self.writer)
         if self.config.record_video:
-            self.record_worker = self_play.RecordPlay(self.model, self.config)
+            self.record_worker = self_play.RecordPlay(self.model, self.game, self.config)
 
     def train(self):
         self.init_workers()
@@ -315,7 +317,7 @@ class MuZero:
         self.model.init_norm = self.checkpoint["init_norm"]
         self.model.target_norm = self.checkpoint["target_norm"]
         self.model.prior_model = self.checkpoint["prior_model"]
-        self.record_worker = self_play.RecordPlay(self.model, self.config)
+        self.record_worker = self_play.RecordPlay(self.model, self.game, self.config)
         total_reward = self.record_worker.start_record(render=render)
         print(f"total reward: {total_reward}")
 
