@@ -375,6 +375,7 @@ class Reanalyse:
                 self.game.legal_actions(),
                 self.game.to_play(),
                 True,
+                mode='learn',
             )
             target_game_history.store_target_search_statistics(index, root, self.config.action_space)
 

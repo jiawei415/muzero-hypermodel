@@ -32,6 +32,11 @@ class BasicConfig():
         self.total_episode = 100
         self.seed = 0
 
+        # MCTS
+        self.play_with_improve = True
+        self.learn_with_improve = True
+        self.search_with_improve = True
+
         ### Game
         self.use_reward_wrapper = False
         self.use_custom_env = True

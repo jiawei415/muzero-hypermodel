@@ -51,8 +51,10 @@ class SelfPlay:
                 self.game.to_play(),
                 True,
             )
-            # action = self.select_action(root, temperature if not temperature_threshold or len(game_history.action_history) < temperature_threshold else 0)
-            action = play_action(root, temperature if not temperature_threshold or len(game_history.action_history) < temperature_threshold else 0, self.config)
+            if self.config.play_with_improve:
+                action = play_action(root, temperature if not temperature_threshold or len(game_history.action_history) < temperature_threshold else 0, self.config)
+            else:
+                action = self.select_action(root, temperature if not temperature_threshold or len(game_history.action_history) < temperature_threshold else 0)
             observation, reward, done = self.game.step(action)
 
             game_history.store_search_statistics(root, self.config.action_space)
@@ -140,8 +142,10 @@ class TestPlay:
                 self.game.to_play(),
                 True,
             )
-            # action = self.select_action(root, temperature=0)
-            action = play_action(root, 0, self.config)
+            if self.config.play_with_improve:
+                action = play_action(root,  0, self.config)
+            else:
+                action = self.select_action(root, 0)
             observation, reward, done = self.game.step(action)
             game_history.store_search_statistics(root, self.config.action_space)
             # Next batch
@@ -214,8 +218,10 @@ class RecordPlay:
                         self.game.to_play(),
                         True,
                     )
-                    # action = self.select_action(root, temperature=0)
-                    action = play_action(root, 0, self.config)
+                    if self.config.play_with_improve:
+                        action = play_action(root,  0, self.config)
+                    else:
+                        action = self.select_action(root, 0)
                 else:
                     obs = torch.tensor(stacked_observations).float().unsqueeze(0)
                     noise_z = torch.tensor(noise_z).float()

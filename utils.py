@@ -24,6 +24,7 @@ class MCTS:
         to_play,
         add_exploration_noise,
         override_root_with=None,
+        mode='search',
     ):
         """
         At the root of the search tree we use the representation function to obtain a
@@ -85,8 +86,18 @@ class MCTS:
 
             while node.expanded():
                 current_tree_depth += 1
-                # action, node = self.select_child(node, min_max_stats)
-                action, node = search_action(node, min_max_stats, self.config)
+                if mode == 'search':
+                    if self.config.search_with_improve:
+                        action, node = search_action(node, min_max_stats, self.config)
+                    else:
+                        action, node = self.select_child(node, min_max_stats)
+                elif mode == 'learn':
+                    if self.config.learn_with_improve:
+                        action, node = search_action(node, min_max_stats, self.config)
+                    else:
+                        action, node = self.select_child(node, min_max_stats)
+                else:
+                    raise NotImplementedError(f'No {mode} mode till now.')
                 search_path.append(node)
 
                 # Players play turn by turn
@@ -392,14 +403,14 @@ def scalar_to_support(x, support_size):
     return logits
 
 
-def gen_new_pi(sum_visit_count, pi, Q, config):
-    lambda_N = config.pb_c_init * math.sqrt(sum_visit_count) / (len(pi) + sum_visit_count)
+def gen_new_pi(sum_visit_count, pi, Q, c_init, eps=0.001):
+    lambda_N = c_init * math.sqrt(sum_visit_count) / (len(pi) + sum_visit_count)
     alpha_min = max(Q + lambda_N * pi)
     alpha_max = max(Q + lambda_N)
     alpha = (alpha_min + alpha_max) / 2
     new_pi = lambda_N * pi / (alpha - Q)
     sum_new_pi = sum(new_pi)
-    while abs(sum_new_pi - 1) > config.eps:
+    while abs(sum_new_pi - 1) > eps:
         if sum_new_pi < 1:
             alpha_max = alpha
         else:
@@ -422,7 +433,7 @@ def search_action(node, min_max_stats, config):
     if sum_visit_count == 0:
         action = numpy.random.choice(config.action_space)
         return action, node.children[action]
-    new_pi = gen_new_pi(sum_visit_count, pi, Q, config)
+    new_pi = gen_new_pi(sum_visit_count, pi, Q, config.pb_c_init, config.eps)
     p = new_pi / sum(new_pi)
     action = numpy.random.choice(config.action_space, p=p)
     return action, node.children[action]
@@ -439,7 +450,7 @@ def play_action(node, temperature, config):
             pi[i], Q[i] = child.prior, child.reward + config.discount * child.value()
         else:
             pi[i], Q[i] = child.prior, 0
-    new_pi = gen_new_pi(sum_visit_count, pi, Q, config)
+    new_pi = gen_new_pi(sum_visit_count, pi, Q,config.pb_c_init, config.eps)
     if temperature == 0:
         action = config.action_space[numpy.argmax(new_pi)]
     else:
