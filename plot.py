@@ -72,7 +72,7 @@ try:
 except:
     time_tag = "2021083101"
 game_name = "deepsea"
-action_num = 2
+action_num = 3
 log_path = f"./results/{game_name}/{time_tag}"
 titles = {"+hyper": "hypermodel", "+prior": "priormodel", "+normal": "normalization", "+target": "target_noise", "+reg": "use_reg_loss"}
 
@@ -93,19 +93,21 @@ for root, dirs, files in os.walk(log_path):
             conf = eval(config[config.key == v].value.to_list()[0])
             if (isinstance(conf, list) and 1 in conf) or (isinstance(conf, bool) and conf):
                 title += k
-        seed = config[config.key == "seed"].value.to_list()[0]
-        td_steps = config[config.key == "td_steps"].value.to_list()[0]
-        value_loss_weight = config[config.key == "value_loss_weight"].value.to_list()[0]
-        num_unroll_steps = config[config.key == "num_unroll_steps"].value.to_list()[0]
-        support_size = config[config.key == "support_size"].value.to_list()[0]
+        # seed = config[config.key == "seed"].value.to_list()[0]
+        # td_steps = config[config.key == "td_steps"].value.to_list()[0]
+        # value_loss_weight = config[config.key == "value_loss_weight"].value.to_list()[0]
+        # num_unroll_steps = config[config.key == "num_unroll_steps"].value.to_list()[0]
+        # support_size = config[config.key == "support_size"].value.to_list()[0]
+        # prior_model_std = config[config.key == "prior_model_std"].value.to_list()[0]
         use_last_layer = config[config.key == "use_last_layer"].value.to_list()[0] if "use_last_layer" in config['key'].values else False
-        prior_model_std = config[config.key == "prior_model_std"].value.to_list()[0]
         base_weight_decay = config[config.key == "base_weight_decay"].value.to_list()[0]
-        label = title + f"\t td_steps: {td_steps} value_loss_weight: {value_loss_weight} num_unroll_steps: {num_unroll_steps} support_size: {support_size} use_last_layer: {use_last_layer} prior_model_std: {prior_model_std} base_weight_decay: {base_weight_decay}"
+        # label = title + f"\t td_steps: {td_steps} value_loss_weight: {value_loss_weight} num_unroll_steps: {num_unroll_steps} support_size: {support_size} use_last_layer: {use_last_layer} prior_model_std: {prior_model_std} base_weight_decay: {base_weight_decay}"
+        label = title + f"\t use_last_layer: {use_last_layer} base_weight_decay: {base_weight_decay}"
         if game_name == "deepsea":
             size = config[config.key == "size"].value.to_list()[0]
             deterministic = config[config.key == "deterministic"].value.to_list()[0] if "deterministic" in config['key'].values else True
-            label += f" size: {size} deterministic: {deterministic}"
+            randomize_actions = config[config.key == "randomize_actions"].value.to_list()[0] if "randomize_actions" in config['key'].values else False
+            label += f" size: {size} deterministic: {deterministic} randomize_actions: {randomize_actions}"
         debug_logs = pd.read_csv(os.path.join(root, 'debug_logs.csv'), sep="\t")
         player_logs = pd.read_csv(os.path.join(root, 'palyer_logs.csv'), sep="\t")
         for k, v in player_datas.items():
