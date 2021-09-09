@@ -102,7 +102,10 @@ for root, dirs, files in os.walk(log_path):
         use_last_layer = config[config.key == "use_last_layer"].value.to_list()[0] if "use_last_layer" in config['key'].values else False
         base_weight_decay = config[config.key == "base_weight_decay"].value.to_list()[0]
         # label = title + f"\t td_steps: {td_steps} value_loss_weight: {value_loss_weight} num_unroll_steps: {num_unroll_steps} support_size: {support_size} use_last_layer: {use_last_layer} prior_model_std: {prior_model_std} base_weight_decay: {base_weight_decay}"
-        label = title + f"\t use_last_layer: {use_last_layer} base_weight_decay: {base_weight_decay}"
+        play_with_improve = config[config.key == "play_with_improve"].value.to_list()[0] if "play_with_improve" in config['key'].values else False
+        learn_with_improve = config[config.key == "learn_with_improve"].value.to_list()[0] if "learn_with_improve" in config['key'].values else False
+        search_with_improve = config[config.key == "search_with_improve"].value.to_list()[0] if "search_with_improve" in config['key'].values else False
+        label = title + f"\t use_last_layer: {use_last_layer} base_weight_decay: {base_weight_decay} play: {play_with_improve} learn: {learn_with_improve} search: {search_with_improve}"
         if game_name == "deepsea":
             size = config[config.key == "size"].value.to_list()[0]
             deterministic = config[config.key == "deterministic"].value.to_list()[0] if "deterministic" in config['key'].values else True

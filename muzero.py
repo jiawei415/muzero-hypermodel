@@ -32,6 +32,7 @@ class MuZero:
         self.game = Game(self.config)
         # Checkpoint and replay buffer used to initialize workers
         self.checkpoint = {
+            "action_mapping": None,
             "weights": None,
             "optimizer_state": None,
             "init_norm": None,
@@ -121,6 +122,8 @@ class MuZero:
         # Initialize workers
         self.shared_storage_worker = shared_storage.SharedStorage(self.checkpoint, self.config)
         self.shared_storage_worker.set_info("terminate", False)
+        if self.config.game_filename == "deepsea":
+            self.shared_storage_worker.set_info('action_mapping', self.game.env._action_mapping)
 
         self.reanalyse_worker = replay_buffer.Reanalyse(self.target_model, self.config)
         self.replay_buffer_worker = replay_buffer.ReplayBuffer(self.reanalyse_worker, self.config)
@@ -313,6 +316,8 @@ class MuZero:
 
     def evaluate(self, ckpt_path, render=False):
         self.checkpoint = torch.load(ckpt_path)
+        if self.config.game_filename == "deepsea":
+            self.game.env._action_mapping = self.checkpoint['action_mapping']
         self.model.set_weights(self.checkpoint["weights"])
         self.model.init_norm = self.checkpoint["init_norm"]
         self.model.target_norm = self.checkpoint["target_norm"]
