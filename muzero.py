@@ -126,7 +126,8 @@ class MuZero:
             "target_model_value",
             "value_params.weight",
             "reward_params.weight",
-            "state_params.weight"
+            "state_params.weight",
+            "action_history"
         ]
         for i in self.config.action_space:
             debug_keys.extend([f"mcts_action_{i}", f"model_action_{i}"])
@@ -191,8 +192,8 @@ class MuZero:
             if self.start_train:
                 self.shared_storage_worker.set_info(losses)
                 self.shared_storage_worker.set_info({"lr": self.optimizer.param_groups[0]["lr"]})
-            self.test()
-            self.debug()
+            action_history = self.test()
+            self.debug(action_history)
             self.run_log(episode)
             if episode % (self.config.total_episode / 10) == 0:
                 self.save_checkpoint(path=f"model{'%03d' % episode}.checkpoint")
@@ -202,6 +203,7 @@ class MuZero:
         self.terminate_workers()
 
     def test(self):
+        action_history = []
         total_reward, mean_value, episode_length = 0, 0, 0
         # for i in tqdm(range(self.config.test_times)):
         for i in range(self.config.test_times):
@@ -213,6 +215,7 @@ class MuZero:
             total_reward += sum(game_history.reward_history)
             mean_value += numpy.mean(game_history.root_values)
             episode_length += len(game_history.action_history) - 1
+            action_history.append(game_history.action_history[1:])
         self.shared_storage_worker.set_info(
             {
                 "test_total_reward": total_reward/self.config.test_times,
@@ -223,8 +226,9 @@ class MuZero:
         if total_reward/self.config.test_times > self.best_reward:
             self.best_reward = total_reward/self.config.test_times
             self.save_checkpoint(path="model_best.checkpoint")
+        return action_history
 
-    def debug(self):
+    def debug(self, action_history):
         counter = self.shared_storage_worker.get_info("played_steps")
         init_state_value, actions_probability, hypermodel_std = self.debug_worker.start_debug()
         debug_log = [counter]
@@ -235,6 +239,7 @@ class MuZero:
         for k, v  in hypermodel_std.items():
             self.writer.add_scalar(f"5.Debug/params/{k}", v, counter)
             debug_log.append(v)
+        debug_log.append(action_history)
         for k, v in actions_probability.items():
             self.writer.add_histogram(f"5.Debug/action/{k}", numpy.array(v), counter)
             self.writer.add_scalar(f"5.Debug/action/{k}_mean", numpy.mean(numpy.array(v)), counter)
