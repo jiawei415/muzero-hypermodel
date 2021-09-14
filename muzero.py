@@ -119,6 +119,21 @@ class MuZero:
         self.palyer_logs = pd.DataFrame(columns=self.keys)
         self.palyer_logs.to_csv(self.palyer_logs_path, sep="\t", index=False)
 
+        debug_keys = [
+            "sample_num",
+            "mcts_value",
+            "model_value",
+            "target_model_value",
+            "value_params.weight",
+            "reward_params.weight",
+            "state_params.weight"
+        ]
+        for i in self.config.action_space:
+            debug_keys.extend([f"mcts_action_{i}", f"model_action_{i}"])
+        self.debug_logs_path = self.config.results_path + "/debug_logs.csv"
+        self.debug_logs = pd.DataFrame(columns=debug_keys)
+        self.debug_logs.to_csv(self.debug_logs_path, sep="\t", index=False)
+
         # Initialize workers
         self.shared_storage_worker = shared_storage.SharedStorage(self.checkpoint, self.config)
         self.shared_storage_worker.set_info("terminate", False)
@@ -211,7 +226,21 @@ class MuZero:
 
     def debug(self):
         counter = self.shared_storage_worker.get_info("played_steps")
-        self.debug_worker.start_debug(counter)
+        init_state_value, actions_probability, hypermodel_std = self.debug_worker.start_debug()
+        debug_log = [counter]
+        for k, v in init_state_value.items():
+            self.writer.add_histogram(f"5.Debug/value/{k}", numpy.array(v), counter)
+            self.writer.add_scalar(f"5.Debug/value/{k}_mean", numpy.mean(numpy.array(v)), counter)
+            debug_log.append(v)
+        for k, v  in hypermodel_std.items():
+            self.writer.add_scalar(f"5.Debug/params/{k}", v, counter)
+            debug_log.append(v)
+        for k, v in actions_probability.items():
+            self.writer.add_histogram(f"5.Debug/action/{k}", numpy.array(v), counter)
+            self.writer.add_scalar(f"5.Debug/action/{k}_mean", numpy.mean(numpy.array(v)), counter)
+            debug_log.append(v)
+        self.debug_logs.loc[counter] = debug_log
+        self.debug_logs.to_csv(self.debug_logs_path, sep="\t", index=False)
 
     def run_log(self, counter):
         info = self.shared_storage_worker.get_info(self.keys)

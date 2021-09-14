@@ -1,7 +1,6 @@
 import numpy
 import torch
 import importlib
-import pandas as pd
 from tqdm import tqdm
 from utils import MCTS, GameHistory, support_to_scalar
 
@@ -16,24 +15,19 @@ class Debug:
         self.writer = writer
         self.noise_dim = int(self.config.hyper_inp_dim)
         self.actions_log = dict()
-        self.value_log = {"mcts_value":[], "target_model_value":[], "model_value":[]}
-        keys = ["counter", "mcts_value", "target_model_value", "model_value"]
-        for i in self.game.legal_actions():
-            keys.extend([f"mcts_action_{i}", f"model_action_{i}"])
+        self.value_log = {"mcts_value":[], "model_value":[], "target_model_value":[]}
+        for i in self.config.action_space:
             self.actions_log[f"mcts_action_{i}"] = []
             self.actions_log[f"model_action_{i}"] = []
-        keys.extend(["value_params", "reward_params", "state_params"])
-        keys.extend(["value_params.weight", "reward_params.weight", "state_params.weight"])
-        self.debug_logs_path = self.config.results_path + "/debug_logs.csv"
-        self.debug_logs = pd.DataFrame(columns=keys)
-        self.debug_logs.to_csv(self.debug_logs_path, sep="\t", index=False)
 
-    def start_debug(self, counter):
+    def start_debug(self):
+        [self.value_log[k].clear() for k in self.value_log.keys()]
+        [self.actions_log[k].clear() for k in self.actions_log.keys()]
         observation = self.game.reset()
         game_history = GameHistory()
         game_history.action_history.append(0)
         game_history.observation_history.append(observation)
-        value_params, reward_params, state_params = [], [], []
+        # value_params, reward_params, state_params = [], [], []
         with torch.no_grad():
             stacked_observations = game_history.get_stacked_observations(
                 -1,
@@ -70,42 +64,21 @@ class Debug:
                 for j in self.config.action_space:
                     self.actions_log[f"mcts_action_{j}"].append(root.children[j].prior)
                     self.actions_log[f"model_action_{j}"].append(debug_policy[j].item())
-                debug_params = self.model.debug(noise_z.to(next(self.model.parameters()).device))
-                for k, v in debug_params.items():
-                    if "value" in k and v is not None:
-                        value_params.append(v)
-                    elif "reward" in k and v is not None:
-                        reward_params.append(v)
-                    elif "state" in k and v is not None:
-                        state_params.append(v)
-            value_params_std = self.calculation_std(value_params)
-            reward_params_std = self.calculation_std(reward_params)
-            state_params_std = self.calculation_std(state_params)
-            params_std = {"value_params": value_params_std, "reward_params": reward_params_std, "state_params": state_params_std}
+            #     debug_params = self.model.debug(noise_z.to(next(self.model.parameters()).device))
+            #     for k, v in debug_params.items():
+            #         if "value" in k and v is not None:
+            #             value_params.append(v)
+            #         elif "reward" in k and v is not None:
+            #             reward_params.append(v)
+            #         elif "state" in k and v is not None:
+            #             state_params.append(v)
+            # value_params_std = self.calculation_std(value_params)
+            # reward_params_std = self.calculation_std(reward_params)
+            # state_params_std = self.calculation_std(state_params)
+            # params_std = {"value_params": value_params_std, "reward_params": reward_params_std, "state_params": state_params_std}
         hypermodel_std = self.model.get_hypermodel()
-        self.debug_log(params_std, hypermodel_std, counter)
         self.game.close()
-
-    def debug_log(self, debug_params, hypermodel_std, counter):
-        debug_log = [counter]
-        for k, v in self.value_log.items():
-            self.writer.add_histogram(f"5.Debug/value/{k}", numpy.array(v), counter)
-            self.writer.add_scalar(f"5.Debug/value/{k}_mean", numpy.mean(numpy.array(v)), counter)
-            debug_log.append(v)
-            self.value_log[k] = []
-        for k, v in self.actions_log.items():
-            self.writer.add_histogram(f"5.Debug/action/{k}", numpy.array(v), counter)
-            self.writer.add_scalar(f"5.Debug/action/{k}_mean", numpy.mean(numpy.array(v)), counter)
-            debug_log.append(v)
-            self.actions_log[k] = []
-        for k, v  in debug_params.items():
-            self.writer.add_scalar(f"5.Debug/params/{k}", v, counter )
-            debug_log.append(v)
-        for k, v  in hypermodel_std.items():
-            self.writer.add_scalar(f"5.Debug/params/{k}", v, counter )
-            debug_log.append(v)
-        self.debug_logs.loc[counter] = debug_log
-        self.debug_logs.to_csv(self.debug_logs_path, sep="\t", index=False)
+        return self.value_log, self.actions_log, hypermodel_std
 
     def calculation_std(self, params):
         n = len(params)
