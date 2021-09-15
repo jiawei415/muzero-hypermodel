@@ -1,5 +1,6 @@
 import os
 import sys
+import torch
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -70,17 +71,18 @@ def gen_ydata(ys, min_len, weight):
 try:
     time_tag = f"2021{sys.argv[1]}"
 except:
-    time_tag = "2021083101"
+    time_tag = "2021091401"
 game_name = "deepsea"
 action_num = 3
+debug_action_history = False
 log_path = f"./results/{game_name}/{time_tag}"
 titles = {"+hyper": "hypermodel", "+prior": "priormodel", "+normal": "normalization", "+target": "target_noise", "+reg": "use_reg_loss"}
 
 for root, dirs, files in os.walk(log_path):
     for name in dirs:
-        print(os.path.join(root, name))
+       print(os.path.join(root, name))
     if len(files) != 0:
-        if 'model' in files[0]:
+        if 'config_logs.csv' not in files:
             continue
         title = "muzero"
         config = pd.read_csv(os.path.join(root, 'config_logs.csv'), sep="\t")
@@ -155,89 +157,9 @@ for root, dirs, files in os.walk(log_path):
                     v_mean[label].append(v[label][2])
                 else:
                     v_mean[label] = [v[label][2]]
-        # tb_data = event_accumulator.EventAccumulator(os.path.join(root, files[2]))
-        # tb_data.Reload()
-        # keys = tb_data.scalars.Keys()
-        # for key in keys:
-        #     if "2.TestPlayer/1.Total_reward" in key:
-        #         y1s[label] = []
-        #         for item in tb_data.scalars.Items(key):
-        #             y1s[label].append(item.value)
-        #     elif "3.Workers/2.Played_steps" in key:
-        #         xs[label] = []
-        #         for item in tb_data.scalars.Items(key):
-        #             xs[label].append(item.value)
 
-def plot_scalar(xs, ys, ylabel, weight):
-    for i, wanted in enumerate(wanteds):
-        plot_flag = False
-        for label in wanted:
-            if label not in xs.keys():
-                continue
-            plot_flag = True
-            x = xs[label][-1]
-            y = ys[label][-1]
-            smoothed_y = smooth(y, weight)
-            plt.plot(x, smoothed_y, label=label, linewidth=3)
-            plt.xlabel('sample num')
-            plt.ylabel(ylabel)
-
-        if plot_flag:
-            plt.title(f"{game_name}_seed{seed}")
-            plt.grid()
-            # plt.legend(bbox_to_anchor=(0.5, -0.5), loc=8, borderaxespad=0, fontsize=16,)
-            plt.legend(loc='upper left', handlelength=5, borderpad=1.2, labelspacing=1.2)
-            plt.tight_layout()
-            # plt.savefig(f"./figures/{game_name}_seed{seed}_{i}")
-            plt.show()
-
-def plot_action(xs, action_datas):
-    for i, wanted in enumerate(wanteds):
-        for label in wanted:
-            if label not in action_datas["mcts_action_0"].keys():
-                continue
-            for action, action_data in action_datas.items():
-                if action_data != {}:
-                    x = xs[label][-1]
-                    y = np.array(action_data[label][2])
-                    y_min = np.array(action_data[label][0])
-                    y_max = np.array(action_data[label][1])
-                    plt.plot(x, y, label=action)
-                    plt.fill_between(x, y_min, y_max, alpha=0.9)
-
-            plt.xlabel("smaple num")
-            plt.ylabel("action probability")
-            plt.title(f"{game_name}_seed{seed}_{label}")
-            plt.legend(loc='upper left', handlelength=5, borderpad=1.2, labelspacing=1.2)
-            plt.tight_layout()
-            # plt.savefig(f"./figures/{game_name}_seed{seed}_{label}")
-            plt.show()
-
-def plot_distribution(xs, ys, ylabel, weight=0.6, plot_mean=True):
-    for i, wanted in enumerate([wanted1, wanted2]):
-        for label in wanted:
-            if label not in xs.keys():
-                continue
-            min_len = min([len(y) for y in ys[label]])
-            x = xs[label][0][:min_len]
-            y, y_min, y_max = gen_ydata(ys[label], min_len, weight)
-            plt.plot(x, y, color='#ff7f0e', label=label)
-            if plot_mean:
-                plt.fill_between(x, y_min, y_max, color='#ff7f0e', alpha=0.9)
-            plt.xlabel('smaple num')
-            plt.ylabel(ylabel)
-            plt.title(f"{game_name}")
-            plt.grid()
-            plt.legend(loc='upper left', handlelength=5, borderpad=1.2, labelspacing=1.2)
-            plt.tight_layout()
-            # plt.savefig(f"./figures/{game_name}_{label}")
-            plt.show()
-
-def plot_all(wanted, xs, value, action, scalar):
+def plot_all(xs, value, action, scalar):
     weight = 0.8
-    # for i, label in enumerate(wanted):
-    #     if label not in xs.keys():
-    #         continue
     for label in xs.keys():
         fig, axes = plt.subplots(len(scalar) + 2, 1, figsize=(20, 30))
         fig.suptitle(game_name + " " + label.replace("\t", "\n"))
@@ -289,47 +211,45 @@ if value_loss != {}:
     scalars.update({"value loss": value_loss})
 if reward_loss != {}:
     scalars.update({"reward loss": reward_loss})
-plot_all(None, played_step, value_mean_datas, action_mean_datas, scalars)
+plot_all(played_step, value_mean_datas, action_mean_datas, scalars)
 
-# wanted1 = ['muzero_p', 'muzero_np']
-# scalars = {"total reward": test_reward}
-# if value_loss != {}:
-#     scalars.update({"value loss": value_loss})
-# if reward_loss != {}:
-#     scalars.update({"reward loss": reward_loss})
-# plot_all(wanted1, played_step, value_mean_datas, action_mean_datas, scalars)
-
-# for suffix in ["p_value", "p_reward", "p_state", "np_value", "np_reward", "np_state"]:
-# for suffix in ["p_reward", "p_state", "np_reward", "np_state"]:
-# for suffix in ["np_reward", "np_state", "np_reward_state"]:
-#     wanted2 = [f'muzero_{suffix}+hyper', f'muzero_{suffix}+hyper+prior', f'muzero_{suffix}+hyper+normal', f'muzero_{suffix}+hyper+target', f'muzero_{suffix}+hyper+reg']
-#     wanted3 = [f'muzero_{suffix}+hyper+prior', f'muzero_{suffix}+hyper+prior+normal', f'muzero_{suffix}+hyper+prior+target', f'muzero_{suffix}+hyper+prior+normal+target']
-#     wanted4 = [f'muzero_{suffix}+hyper+normal', f'muzero_{suffix}+hyper+prior+normal', f'muzero_{suffix}+hyper+normal+target', f'muzero_{suffix}+hyper+prior+normal+target']
-#     wanted5 = [f'muzero_{suffix}+hyper+target', f'muzero_{suffix}+hyper+prior+target', f'muzero_{suffix}+hyper+normal+target', f'muzero_{suffix}+hyper+prior+normal+target']
-#     wanted6 = [f'muzero_{suffix}+hyper', f'muzero_{suffix}+hyper+prior+normal+target+reg']
-#     wanted7 = [f'muzero_{suffix}+hyper+prior', f'muzero_{suffix}+hyper+prior+target']
-#     wanteds = [wanted1, wanted2, wanted3, wanted4, wanted5]
-
-#     scalars = {"total reward": test_reward}
-#     if reward_params_std != {}:
-#         scalars.update({"reward variance": reward_params_std})
-#     if state_params_std != {}:
-#         scalars.update({"state variance": state_params_std})
-#     if value_loss != {}:
-#         scalars.update({"value loss": value_loss})
-#     if reward_loss != {}:
-#         scalars.update({"reward loss": reward_loss})
-    # plot_all(wanted7, played_step, value_mean_datas, action_mean_datas, scalars)
-
-    # plot_scalar(played_step, test_reward, 'total reward', 0.9)
-    # plot_scalar(played_step, params_std, f"{suffix} variance", 0.6)
-    # plot_scalar(played_step, value_loss, "value loss", 0.6)
-    # plot_action(played_step, action_datas)
-
-    # plot_distribution(played_step, test_reward, "total reward", 0.9)
-    # plot_distribution(played_step, params_std, f"{suffix} variance", 0.6)
-    # plot_distribution(played_step, value_loss, "value loss")
-
-    # plot_distribution(played_step, test_reward, "total reward", 0.9, False)
-    # plot_distribution(played_step, params_std, f"{suffix} variance", 0.6, False)
-    # plot_distribution(played_step, value_loss, "value loss", 0.6, False)
+if debug_action_history:
+    for root, dirs, files in os.walk(log_path):
+        if len(files) != 0:
+            title = "muzero"
+            config = pd.read_csv(os.path.join(root, 'config_logs.csv'), sep="\t")
+            title += "_p" if eval(config[config.key == "PER"].value.to_list()[0]) else "_np"
+            v, r, s = eval(config[config.key == "hypermodel"].value.to_list()[0])
+            if v == 1: title += '_value'
+            if r == 1: title += '_reward'
+            if s == 1: title += '_state'
+            for k, v in titles.items():
+                conf = eval(config[config.key == v].value.to_list()[0])
+                if (isinstance(conf, list) and 1 in conf) or (isinstance(conf, bool) and conf):
+                    title += k
+            seed = config[config.key == "seed"].value.to_list()[0]
+            size = config[config.key == "size"].value.to_list()[0]
+            deterministic = config[config.key == "deterministic"].value.to_list()[0] if "deterministic" in config['key'].values else True
+            randomize_actions = config[config.key == "randomize_actions"].value.to_list()[0] if "randomize_actions" in config['key'].values else False
+            use_last_layer = config[config.key == "use_last_layer"].value.to_list()[0] if "use_last_layer" in config['key'].values else False
+            base_weight_decay = config[config.key == "base_weight_decay"].value.to_list()[0] if "base_weight_decay" in config['key'].values else 0.0001
+            play_with_improve = config[config.key == "play_with_improve"].value.to_list()[0] if "play_with_improve" in config['key'].values else False
+            learn_with_improve = config[config.key == "learn_with_improve"].value.to_list()[0] if "learn_with_improve" in config['key'].values else False
+            search_with_improve = config[config.key == "search_with_improve"].value.to_list()[0] if "search_with_improve" in config['key'].values else False
+            label = title + f"\t seed: {seed} size: {size} deterministic: {deterministic} randomize_actions: {randomize_actions}"
+            label += f" use_last_layer: {use_last_layer} base_weight_decay: {base_weight_decay} play: {play_with_improve} learn: {learn_with_improve} search: {search_with_improve}"
+            if not eval(randomize_actions):
+                continue
+            checkpoint = torch.load(os.path.join(root, 'model_best.checkpoint'))
+            action_right = np.diagonal(checkpoint['action_mapping']).astype(np.int32)
+            print(f"label: {label}")
+            debug_logs = pd.read_csv(os.path.join(root, 'debug_logs.csv'), sep="\t")
+            best_score = float('-inf')
+            best_actions = np.ones(int(size))
+            for item in debug_logs['action_history']:
+                now_actions = np.array(eval(item)[0])
+                now_score = np.sum(now_actions == action_right)
+                if now_score > best_score:
+                    best_score = now_score
+                    best_actions = now_actions
+                    print(f"action_right: {action_right} \nbest_actions: {best_actions} score: {best_score}")
