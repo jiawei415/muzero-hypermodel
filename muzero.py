@@ -235,7 +235,7 @@ class MuZero:
         for k, v in init_state_value.items():
             self.writer.add_histogram(f"5.Debug/value/{k}", numpy.array(v), counter)
             self.writer.add_scalar(f"5.Debug/value/{k}_mean", numpy.mean(numpy.array(v)), counter)
-            debug_log.append(v)
+            debug_log.append(str(v))
         for k, v  in hypermodel_std.items():
             self.writer.add_scalar(f"5.Debug/params/{k}", v, counter)
             debug_log.append(v)
@@ -243,8 +243,9 @@ class MuZero:
         for k, v in actions_probability.items():
             self.writer.add_histogram(f"5.Debug/action/{k}", numpy.array(v), counter)
             self.writer.add_scalar(f"5.Debug/action/{k}_mean", numpy.mean(numpy.array(v)), counter)
-            debug_log.append(v)
-        self.debug_logs.loc[counter] = debug_log
+            debug_log.append(str(v))
+        index = len(self.debug_logs.index)
+        self.debug_logs.loc[index] = debug_log
         self.debug_logs.to_csv(self.debug_logs_path, sep="\t", index=False)
 
     def run_log(self, counter):
@@ -265,7 +266,8 @@ class MuZero:
             info["policy_loss"],
             info["lr"],
         ]
-        self.palyer_logs.loc[counter] = palyer_log
+        index = len(self.palyer_logs.index)
+        self.palyer_logs.loc[index] = palyer_log
         self.palyer_logs.to_csv(self.palyer_logs_path, sep="\t", index=False)
 
         self.writer.add_scalar("1.TrainPlayer/1.Total_reward", info["train_total_reward"], counter)
