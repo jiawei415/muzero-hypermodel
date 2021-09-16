@@ -192,8 +192,8 @@ class MuZero:
             if self.start_train:
                 self.shared_storage_worker.set_info(losses)
                 self.shared_storage_worker.set_info({"lr": self.optimizer.param_groups[0]["lr"]})
-            action_history = self.test()
-            self.debug(action_history)
+            self.test()
+            self.debug(game_history.action_history[1:])
             self.run_log(episode)
             if episode % (self.config.total_episode / 10) == 0:
                 self.save_checkpoint(path=f"model{'%03d' % episode}.checkpoint")
@@ -226,7 +226,7 @@ class MuZero:
         if total_reward/self.config.test_times > self.best_reward:
             self.best_reward = total_reward/self.config.test_times
             self.save_checkpoint(path="model_best.checkpoint")
-        return action_history
+        # return action_history
 
     def debug(self, action_history):
         counter = self.shared_storage_worker.get_info("played_steps")
