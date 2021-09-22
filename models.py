@@ -168,9 +168,9 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
 
     def prediction(self, encoded_state, noise_z):
         policy_logits = self.prediction_policy_network(encoded_state)
-        if self.value_hyper and not self.config.output_prior:
+        if self.value_hyper:
             value_params = self.value_hyper_model(noise_z)
-            if self.value_prior:
+            if self.value_prior and not self.config.output_prior:
                 value_prior_params = torch.mm(noise_z, self.value_prior_model.to(noise_z.device))
                 value_params_ = value_params + value_prior_params
             else:
