@@ -386,8 +386,8 @@ class Actor:
         if self.config.optimizer == "SGD":
             optimizer = torch.optim.SGD(
                 [
-                    {'params': (p for name, p in model.named_parameters() if 'hyper' not in name)},
-                    {'params': (p for name, p in model.named_parameters() if 'hyper' in name), 'weight_decay': self.config.hyper_weight_decay}
+                    {'params': (p for name, p in model.named_parameters() if 'prior' not in name and 'hyper' not in name)},
+                    {'params': (p for name, p in model.named_parameters() if 'prior' not in name and 'hyper' in name), 'weight_decay': self.config.hyper_weight_decay}
                 ],
                 lr=self.config.lr_init,
                 momentum=self.config.momentum,
@@ -396,8 +396,8 @@ class Actor:
         elif self.config.optimizer == "Adam":
             optimizer = torch.optim.Adam(
                 [
-                    {'params': (p for name, p in model.named_parameters() if 'hyper' not in name)},
-                    {'params': (p for name, p in model.named_parameters() if 'hyper' in name), 'weight_decay': self.config.hyper_weight_decay}
+                    {'params': (p for name, p in model.named_parameters() if 'prior' not in name and 'hyper' not in name)},
+                    {'params': (p for name, p in model.named_parameters() if 'prior' not in name and 'hyper' in name), 'weight_decay': self.config.hyper_weight_decay}
                 ],
                 lr=self.config.lr_init,
                 weight_decay=self.config.base_weight_decay,

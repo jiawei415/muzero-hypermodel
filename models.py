@@ -82,7 +82,8 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             state_params_out_dim = sum(self.splited_sizes['state'])
             self.state_hyper_model = torch.nn.Linear(state_params_inp_dim, state_params_out_dim)
             if self.state_prior:
-                self.prior_model['state'] = self.gen_prior_model(state_params_inp_dim, state_params_out_dim)
+                self.state_prior_model = self.gen_prior_model(state_params_inp_dim, state_params_out_dim)
+                self.prior_model['state'] = self.state_prior_model
             if self.state_normal:
                 self.init_norm['state'], self.target_norm['state'] = [], []
         else:
@@ -102,7 +103,8 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             reward_params_out_dim = sum(self.splited_sizes['reward'])
             self.reward_hyper_model = torch.nn.Linear(reward_params_inp_dim, reward_params_out_dim)
             if self.reward_prior:
-                self.prior_model['reward'] = self.gen_prior_model(reward_params_inp_dim, reward_params_out_dim)
+                self.reward_prior_model = self.gen_prior_model(reward_params_inp_dim, reward_params_out_dim)
+                self.prior_model['reward'] = self.reward_prior_model
             if self.reward_normal:
                 self.init_norm['reward'], self.target_norm['reward'] = [], []
         else:
@@ -120,7 +122,8 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             value_params_out_dim = sum(self.splited_sizes['value'])
             self.value_hyper_model = torch.nn.Linear(value_params_inp_dim, value_params_out_dim)
             if self.value_prior:
-                self.prior_model['value'] = self.gen_prior_model(value_params_inp_dim, value_params_out_dim)
+                self.value_prior_model = self.gen_prior_model(value_params_inp_dim, value_params_out_dim)
+                self.prior_model['value'] = self.value_prior_model
             if self.value_normal:
                 self.init_norm['value'], self.target_norm['value'] = [], []
         else:
@@ -146,7 +149,8 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         prior_B = normal_deviates / radius
         prior_D = numpy.eye(out_dim)
         prior_params = torch.from_numpy(prior_D.dot(prior_B)).float()
-        return prior_params.T
+        # return prior_params.T
+        return torch.nn.Parameter(data=prior_params.T, requires_grad=False)
     
     def representation(self, observation):
         encoded_state = self.representation_network(
@@ -167,7 +171,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         if self.value_hyper:
             value_params = self.value_hyper_model(noise_z)
             if self.value_prior:
-                value_prior_params = torch.mm(noise_z, self.prior_model['value'].to(noise_z.device))
+                value_prior_params = torch.mm(noise_z, self.value_prior_model.to(noise_z.device))
                 value_params_ = value_params + value_prior_params
             else:
                 value_params_ = value_params
@@ -196,7 +200,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         if self.state_hyper:
             state_params = self.state_hyper_model(noise_z)
             if self.state_prior:
-                state_prior_params = torch.mm(noise_z, self.prior_model['state'].to(noise_z.device))
+                state_prior_params = torch.mm(noise_z, self.state_prior_model.to(noise_z.device))
                 state_params_ = state_params + state_prior_params
             else:
                 state_params_ = state_params
@@ -214,7 +218,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         if self.reward_hyper:
             reward_params = self.reward_hyper_model(noise_z)
             if self.reward_prior:
-                reward_prior_params = torch.mm(noise_z, self.prior_model['reward'].to(noise_z.device))
+                reward_prior_params = torch.mm(noise_z, self.reward_prior_model.to(noise_z.device))
                 reward_params_ = reward_params + reward_prior_params
             else:
                 reward_params_ = reward_params

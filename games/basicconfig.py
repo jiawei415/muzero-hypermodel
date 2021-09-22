@@ -7,7 +7,7 @@ class BasicConfig():
         self.normalization = [0, 0, 0]
         self.target_noise = [0, 0, 0]
 
-        self.use_priormodel = False
+        self.use_priormodel = True
         self.use_normalization = False
         self.use_target_noise = False
         self.use_reg_loss = False
