@@ -369,6 +369,9 @@ class Actor:
     def initial_model(self):
         device = "cuda" if torch.cuda.is_available() else "cpu"
         model = models.MuZeroNetwork(self.config).to(device)
+        for name, param in model.named_parameters():
+            if 'prior' in name:
+                param.requires_grad = False
         target_model = models.MuZeroNetwork(self.config).to(device)
         weigths = model.get_weights()
         summary = str(model).replace("\n", " \n\n")
