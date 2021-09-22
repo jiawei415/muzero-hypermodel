@@ -168,7 +168,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
 
     def prediction(self, encoded_state, noise_z):
         policy_logits = self.prediction_policy_network(encoded_state)
-        if self.value_hyper:
+        if self.value_hyper and not self.config.output_prior:
             value_params = self.value_hyper_model(noise_z)
             if self.value_prior:
                 value_prior_params = torch.mm(noise_z, self.value_prior_model.to(noise_z.device))
@@ -182,6 +182,11 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
                 split_params = self.get_normal_params(split_params, "value")
             hidden_out = self.value_base_model(encoded_state)
             value = self.hypermodel_forward(hidden_out, split_params)
+            if self.value_prior and self.config.output_prior:
+                value_prior_params = torch.mm(noise_z, self.value_prior_model.to(noise_z.device))
+                split_params = self.split_params(value_prior_params, "value")
+                prior_value = self.hypermodel_forward(hidden_out, split_params)
+                value += prior_value
         else:
             value = self.prediction_value_network(encoded_state)
             value_params = None
@@ -199,7 +204,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
 
         if self.state_hyper:
             state_params = self.state_hyper_model(noise_z)
-            if self.state_prior:
+            if self.state_prior and not self.config.output_prior:
                 state_prior_params = torch.mm(noise_z, self.state_prior_model.to(noise_z.device))
                 state_params_ = state_params + state_prior_params
             else:
@@ -211,13 +216,18 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
                 split_params = self.get_normal_params(split_params, "state")
             hidden_out = self.state_base_model(x)
             next_encoded_state = self.hypermodel_forward(hidden_out, split_params)
+            if self.state_prior and self.config.output_prior:
+                state_prior_params = torch.mm(noise_z, self.state_prior_model.to(noise_z.device))
+                split_params = self.split_params(state_prior_params, "state")
+                prior_next_encoded_state = self.hypermodel_forward(hidden_out, split_params)
+                next_encoded_state += prior_next_encoded_state
         else:
             next_encoded_state = self.dynamics_encoded_state_network(x)
             state_params = None
 
         if self.reward_hyper:
             reward_params = self.reward_hyper_model(noise_z)
-            if self.reward_prior:
+            if self.reward_prior and not self.config.output_prior:
                 reward_prior_params = torch.mm(noise_z, self.reward_prior_model.to(noise_z.device))
                 reward_params_ = reward_params + reward_prior_params
             else:
@@ -229,6 +239,11 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
                 split_params = self.get_normal_params(split_params, "reward")
             hidden_out = self.reward_base_model(next_encoded_state)
             reward = self.hypermodel_forward(hidden_out, split_params)
+            if self.reward_prior and self.config.output_prior:
+                reward_prior_params = torch.mm(noise_z, self.reward_prior_model.to(noise_z.device))
+                split_params = self.split_params(reward_prior_params, "reward")
+                prior_reward = self.hypermodel_forward(hidden_out, split_params)
+                reward += prior_reward
         else:
             reward = self.dynamics_reward_network(next_encoded_state)
             reward_params = None
