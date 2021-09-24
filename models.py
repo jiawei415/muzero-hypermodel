@@ -82,7 +82,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             state_params_out_dim = sum(self.splited_sizes['state'])
             self.state_hyper_model = torch.nn.Linear(state_params_inp_dim, state_params_out_dim)
             if self.state_prior:
-                self.state_prior_base_model = self.gen_base_model(base_model_sizes)
+                self.state_prior_base_model = self.gen_base_model(base_model_sizes if config.use_prior_basemodel else [])
                 self.state_prior_model = self.gen_prior_model(state_params_inp_dim, state_params_out_dim)
                 self.prior_model['state'] = self.state_prior_model
             if self.state_normal:
@@ -97,14 +97,14 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         if self.reward_hyper:
             print(f"use dynamics reward hypermodel!")
             sizes = [encoding_size] + fc_reward_layers + [self.full_support_size]
-            base_model_sizes, hyper_model_sizes = (sizes[:-1], sizes[-2:] )if config.use_last_layer else ([], sizes)
+            base_model_sizes, hyper_model_sizes = (sizes[:-1], sizes[-2:]) if config.use_last_layer else ([], sizes)
             self.reward_base_model = self.gen_base_model(base_model_sizes)
             self.splited_shapes['reward'], self.splited_sizes['reward'] = self.gen_shape_size(hyper_model_sizes)
             reward_params_inp_dim = config.hyper_inp_dim
             reward_params_out_dim = sum(self.splited_sizes['reward'])
             self.reward_hyper_model = torch.nn.Linear(reward_params_inp_dim, reward_params_out_dim)
             if self.reward_prior:
-                self.reward_prior_base_model = self.gen_base_model(base_model_sizes)
+                self.reward_prior_base_model = self.gen_base_model(base_model_sizes if config.use_prior_basemodel else [])
                 self.reward_prior_model = self.gen_prior_model(reward_params_inp_dim, reward_params_out_dim)
                 self.prior_model['reward'] = self.reward_prior_model
             if self.reward_normal:
@@ -124,7 +124,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             value_params_out_dim = sum(self.splited_sizes['value'])
             self.value_hyper_model = torch.nn.Linear(value_params_inp_dim, value_params_out_dim)
             if self.value_prior:
-                self.value_prior_base_model = self.gen_base_model(base_model_sizes)
+                self.value_prior_base_model = self.gen_base_model(base_model_sizes if config.use_prior_basemodel else [])
                 self.value_prior_model = self.gen_prior_model(value_params_inp_dim, value_params_out_dim)
                 self.prior_model['value'] = self.value_prior_model
             if self.value_normal:
@@ -133,6 +133,8 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             self.prediction_value_network = mlp(encoding_size, fc_value_layers, self.full_support_size)
 
     def gen_base_model(self, sizes):
+        if len(sizes) < 1:
+            return None
         layers = []
         for i in range(len(sizes) - 1):
             layers += [torch.nn.Linear(sizes[i], sizes[i + 1]), torch.nn.ELU()]
@@ -183,12 +185,12 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
                 if len(self.init_norm['value']) == 0:
                     self.gen_norm(split_params, "value")
                 split_params = self.get_normal_params(split_params, "value")
-            hidden_out = self.value_base_model(encoded_state)
+            hidden_out = self.value_base_model(encoded_state) if self.value_base_model else encoded_state
             value = self.hypermodel_forward(hidden_out, split_params)
             if self.value_prior and self.config.output_prior:
                 value_prior_params = torch.mm(noise_z, self.value_prior_model.to(noise_z.device))
                 split_params = self.split_params(value_prior_params, "value")
-                prior_hidden_out = self.value_prior_base_model(encoded_state) if self.config.use_prior_basemodel else hidden_out
+                prior_hidden_out = self.value_prior_base_model(encoded_state) if self.value_prior_base_model else hidden_out
                 prior_value = self.hypermodel_forward(prior_hidden_out, split_params)
                 value += prior_value
         else:
@@ -218,12 +220,12 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
                 if len(self.init_norm['state']) == 0:
                     self.gen_norm(split_params, "state")
                 split_params = self.get_normal_params(split_params, "state")
-            hidden_out = self.state_base_model(x)
+            hidden_out = self.state_base_model(x) if self.state_base_model else x
             next_encoded_state = self.hypermodel_forward(hidden_out, split_params)
             if self.state_prior and self.config.output_prior:
                 state_prior_params = torch.mm(noise_z, self.state_prior_model.to(noise_z.device))
                 split_params = self.split_params(state_prior_params, "state")
-                prior_hidden_out = self.state_prior_base_model(x) if self.config.use_prior_basemodel else hidden_out
+                prior_hidden_out = self.state_prior_base_model(x) if self.state_prior_base_model else hidden_out
                 prior_next_encoded_state = self.hypermodel_forward(prior_hidden_out, split_params)
                 next_encoded_state += prior_next_encoded_state
         else:
@@ -242,12 +244,12 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
                 if len(self.init_norm['reward']) == 0:
                     self.gen_norm(split_params, "reward")
                 split_params = self.get_normal_params(split_params, "reward")
-            hidden_out = self.reward_base_model(next_encoded_state)
+            hidden_out = self.reward_base_model(next_encoded_state) if self.reward_base_model else next_encoded_state
             reward = self.hypermodel_forward(hidden_out, split_params)
             if self.reward_prior and self.config.output_prior:
                 reward_prior_params = torch.mm(noise_z, self.reward_prior_model.to(noise_z.device))
                 split_params = self.split_params(reward_prior_params, "reward")
-                prior_hidden_out = self.reward_prior_base_model(next_encoded_state) if self.config.use_prior_basemodel else hidden_out
+                prior_hidden_out = self.reward_prior_base_model(next_encoded_state) if self.reward_prior_base_model else hidden_out
                 prior_reward = self.hypermodel_forward(prior_hidden_out, split_params)
                 reward += prior_reward
         else:
