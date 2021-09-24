@@ -25,6 +25,7 @@ class Game(AbstractGame):
             self.env = MountainCar(config)
         else:
             self.env = gym.make("MountainCar-v0")
+            self.env = TimeLimit(self.env, max_episode_steps=500)
         if config.seed is not None:
             self.env.seed(config.seed)
         if config.record_video:

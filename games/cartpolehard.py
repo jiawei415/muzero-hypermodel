@@ -1,6 +1,7 @@
 import gym
 import math
 import numpy as np
+from gym.wrappers import TimeLimit, Monitor
 from gym import spaces, logger
 from gym.utils import seeding
 from .basicconfig import BasicConfig
@@ -20,10 +21,16 @@ class Game(AbstractGame):
     Game wrapper.
     """
 
-    def __init__(self, config, record_video=False):
+    def __init__(self, config):
         self.env = CartPoleHard(config)
         if config.seed is not None:
             self.env.seed(config.seed)
+            self.env = TimeLimit(self.env, max_episode_steps=500)
+        if config.record_video:
+            record_frequency = config.record_frequency
+            video_callable = lambda episode: episode % record_frequency == 0
+            self.env = TimeLimit(self.env, max_episode_steps=500)
+            self.env = Monitor(self.env, f'{config.results_path}/videos', video_callable=video_callable, force=True)
 
     def step(self, action):
         """

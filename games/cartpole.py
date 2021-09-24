@@ -1,5 +1,6 @@
 import gym
 import numpy
+from gym.wrappers import TimeLimit, Monitor
 from .basicconfig import BasicConfig
 from .abstract_game import AbstractGame
 
@@ -9,17 +10,22 @@ class MuZeroConfig(BasicConfig):
         super(MuZeroConfig, self).__init__()
         self.observation_shape = (1, 1, 4)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
         self.action_space = list(range(2))  # Fixed list of all possible actions. You should only edit the length
-        self.players = list(range(1))  # List of players. You should only edit the length
 
 class Game(AbstractGame):
     """
     Game wrapper.
     """
 
-    def __init__(self, config, record_video=False):
+    def __init__(self, config):
         self.env = gym.make("CartPole-v1")
         if config.seed is not None:
             self.env.seed(config.seed)
+            self.env = TimeLimit(self.env, max_episode_steps=500)
+        if config.record_video:
+            record_frequency = config.record_frequency
+            video_callable = lambda episode: episode % record_frequency == 0
+            self.env = TimeLimit(self.env, max_episode_steps=500)
+            self.env = Monitor(self.env, f'{config.results_path}/videos', video_callable=video_callable, force=True)
 
     def step(self, action):
         """
