@@ -32,6 +32,7 @@ class MuZero:
         self.game = Game(self.config)
         # Checkpoint and replay buffer used to initialize workers
         self.checkpoint = {
+            "config": self.config.__dict__,
             "action_mapping": None,
             "weights": None,
             "optimizer_state": None,
@@ -385,23 +386,21 @@ class Actor:
         return model, target_model, weigths, summary
 
     def initial_optimizer(self, model):
+        trainable_params = [
+            {'params': (p for name, p in model.named_parameters() if 'prior' not in name and 'hyper' not in name)},
+            {'params': (p for name, p in model.named_parameters() if 'prior' not in name and 'hyper' in name), 'weight_decay': self.config.hyper_weight_decay}
+        ]
         # Initialize the optimizer
         if self.config.optimizer == "SGD":
             optimizer = torch.optim.SGD(
-                [
-                    {'params': (p for name, p in model.named_parameters() if 'prior' not in name and 'hyper' not in name)},
-                    {'params': (p for name, p in model.named_parameters() if 'prior' not in name and 'hyper' in name), 'weight_decay': self.config.hyper_weight_decay}
-                ],
+                trainable_params,
                 lr=self.config.lr_init,
                 momentum=self.config.momentum,
                 weight_decay=self.config.base_weight_decay,
             )
         elif self.config.optimizer == "Adam":
             optimizer = torch.optim.Adam(
-                [
-                    {'params': (p for name, p in model.named_parameters() if 'prior' not in name and 'hyper' not in name)},
-                    {'params': (p for name, p in model.named_parameters() if 'prior' not in name and 'hyper' in name), 'weight_decay': self.config.hyper_weight_decay}
-                ],
+                trainable_params,
                 lr=self.config.lr_init,
                 weight_decay=self.config.base_weight_decay,
             )
@@ -422,7 +421,7 @@ def get_args():
     parser.add_argument('--game', type=str, default="deepsea",
                         help='game name')
     parser.add_argument('--config', type=str, default="{}",
-                        help="game config eg., {'seed':0,'hypermodel':[0,1,1],'use_last_layer':False}")
+                        help="game config eg., {'train_frequency':10,'hypermodel':[0,1,1],'use_last_layer':True,'use_prior_basemodel':False}")
     parser.add_argument('--ckpt-path', type=str, default="",
                         help="checkpoint path for evaluation")
     parser.add_argument('--render', default=False, action='store_true')
