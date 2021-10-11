@@ -154,7 +154,6 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         prior_B = normal_deviates / radius
         prior_D = numpy.eye(out_dim)
         prior_params = torch.from_numpy(prior_D.dot(prior_B)).float()
-        # return prior_params.T
         return torch.nn.Parameter(data=prior_params.T, requires_grad=False)
     
     def representation(self, observation):

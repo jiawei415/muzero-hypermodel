@@ -204,7 +204,6 @@ class MuZero:
         self.terminate_workers()
 
     def test(self):
-        action_history = []
         total_reward, mean_value, episode_length = 0, 0, 0
         # for i in tqdm(range(self.config.test_times)):
         for i in range(self.config.test_times):
@@ -216,7 +215,6 @@ class MuZero:
             total_reward += sum(game_history.reward_history)
             mean_value += numpy.mean(game_history.root_values)
             episode_length += len(game_history.action_history) - 1
-            action_history.append(game_history.action_history[1:])
         self.shared_storage_worker.set_info(
             {
                 "test_total_reward": total_reward/self.config.test_times,
@@ -227,7 +225,6 @@ class MuZero:
         if total_reward/self.config.test_times > self.best_reward:
             self.best_reward = total_reward/self.config.test_times
             self.save_checkpoint(path="model_best.checkpoint")
-        # return action_history
 
     def debug(self, action_history):
         counter = self.shared_storage_worker.get_info("played_steps")
