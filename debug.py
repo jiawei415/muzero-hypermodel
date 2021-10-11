@@ -76,7 +76,7 @@ class Debug:
             # reward_params_std = self.calculation_std(reward_params)
             # state_params_std = self.calculation_std(state_params)
             # params_std = {"value_params": value_params_std, "reward_params": reward_params_std, "state_params": state_params_std}
-        hypermodel_std = self.model.get_hypermodel()
+        hypermodel_std = self.model.get_hypermodel_std()
         self.game.close()
         return self.value_log, self.actions_log, hypermodel_std
 

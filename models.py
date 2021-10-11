@@ -62,83 +62,69 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         if not self.config.use_representation and self.config.stacked_observations == 0:
             encoding_size = self.config.observation_shape[-1]
         else:
-            self.representation_network = mlp(
-                    observation_shape[0]
-                    * observation_shape[1]
-                    * observation_shape[2]
-                    * (stacked_observations + 1)
-                    + stacked_observations * observation_shape[1] * observation_shape[2],
-                    fc_representation_layers,
-                    encoding_size,
+            self.representation_network = self.gen_base_model(
+                    [observation_shape[0] * observation_shape[1] * observation_shape[2] * (stacked_observations + 1)
+                    + stacked_observations * observation_shape[1] * observation_shape[2]]
+                    + fc_representation_layers + [encoding_size]
                 )
 
         if self.state_hyper:
             print(f"use dynamics state hypermodel!")
             sizes = [encoding_size + self.action_space_size] + fc_dynamics_layers + [encoding_size]
             base_model_sizes, hyper_model_sizes = (sizes[:-1], sizes[-2:]) if config.use_last_layer else ([], sizes)
-            self.state_base_model = self.gen_base_model(base_model_sizes)
+            self.state_base_model = self.gen_base_model(base_model_sizes, output_activation=torch.nn.ELU)
             self.splited_shapes['state'], self.splited_sizes['state'] = self.gen_shape_size(hyper_model_sizes)
             state_params_inp_dim = config.hyper_inp_dim
             state_params_out_dim = sum(self.splited_sizes['state'])
             self.state_hyper_model = torch.nn.Linear(state_params_inp_dim, state_params_out_dim)
             if self.state_prior:
-                self.state_prior_base_model = self.gen_base_model(base_model_sizes if config.use_prior_basemodel else [])
-                self.state_prior_model = self.gen_prior_model(state_params_inp_dim, state_params_out_dim)
-                self.prior_model['state'] = self.state_prior_model
+                self.state_prior_base_model = self.gen_base_model(base_model_sizes if config.use_prior_basemodel else [], bias=False, output_activation=torch.nn.ELU)
+                self.state_prior_hyper_model = self.gen_prior_model(state_params_inp_dim, state_params_out_dim)
+                self.prior_model['state'] = self.state_prior_hyper_model
             if self.state_normal:
                 self.init_norm['state'], self.target_norm['state'] = [], []
         else:
-            self.dynamics_encoded_state_network = mlp(
-                    encoding_size + self.action_space_size,
-                    fc_dynamics_layers,
-                    encoding_size,
+            self.dynamics_encoded_state_network = self.gen_base_model(
+                    [encoding_size + self.action_space_size] + fc_dynamics_layers + [encoding_size]
                 )
 
         if self.reward_hyper:
             print(f"use dynamics reward hypermodel!")
             sizes = [encoding_size] + fc_reward_layers + [self.full_support_size]
             base_model_sizes, hyper_model_sizes = (sizes[:-1], sizes[-2:]) if config.use_last_layer else ([], sizes)
-            self.reward_base_model = self.gen_base_model(base_model_sizes)
+            self.reward_base_model = self.gen_base_model(base_model_sizes, output_activation=torch.nn.ELU)
             self.splited_shapes['reward'], self.splited_sizes['reward'] = self.gen_shape_size(hyper_model_sizes)
             reward_params_inp_dim = config.hyper_inp_dim
             reward_params_out_dim = sum(self.splited_sizes['reward'])
             self.reward_hyper_model = torch.nn.Linear(reward_params_inp_dim, reward_params_out_dim)
             if self.reward_prior:
-                self.reward_prior_base_model = self.gen_base_model(base_model_sizes if config.use_prior_basemodel else [])
-                self.reward_prior_model = self.gen_prior_model(reward_params_inp_dim, reward_params_out_dim)
-                self.prior_model['reward'] = self.reward_prior_model
+                self.reward_prior_base_model = self.gen_base_model(base_model_sizes if config.use_prior_basemodel else [], bias=False, output_activation=torch.nn.ELU)
+                self.reward_prior_hyper_model = self.gen_prior_model(reward_params_inp_dim, reward_params_out_dim)
+                self.prior_model['reward'] = self.reward_prior_hyper_model
             if self.reward_normal:
                 self.init_norm['reward'], self.target_norm['reward'] = [], []
         else:
-            self.dynamics_reward_network =  mlp(encoding_size, fc_reward_layers, self.full_support_size)
+            self.dynamics_reward_network =  self.gen_base_model([encoding_size] + fc_reward_layers + [self.full_support_size])
 
-        self.prediction_policy_network = mlp(encoding_size, fc_policy_layers, self.action_space_size)
+        self.prediction_policy_network = self.gen_base_model([encoding_size] + fc_policy_layers + [self.action_space_size])
 
         if self.value_hyper:
             print(f"use prediction value hypermodel!")
             sizes = [encoding_size] + fc_value_layers + [self.full_support_size]
             base_model_sizes, hyper_model_sizes = (sizes[:-1], sizes[-2:]) if config.use_last_layer else ([], sizes)
-            self.value_base_model = self.gen_base_model(base_model_sizes)
+            self.value_base_model = self.gen_base_model(base_model_sizes, output_activation=torch.nn.ELU)
             self.splited_shapes['value'], self.splited_sizes['value'] = self.gen_shape_size(hyper_model_sizes)
             value_params_inp_dim = config.hyper_inp_dim
             value_params_out_dim = sum(self.splited_sizes['value'])
             self.value_hyper_model = torch.nn.Linear(value_params_inp_dim, value_params_out_dim)
             if self.value_prior:
-                self.value_prior_base_model = self.gen_base_model(base_model_sizes if config.use_prior_basemodel else [])
-                self.value_prior_model = self.gen_prior_model(value_params_inp_dim, value_params_out_dim)
-                self.prior_model['value'] = self.value_prior_model
+                self.value_prior_base_model = self.gen_base_model(base_model_sizes if config.use_prior_basemodel else [], bias=False, output_activation=torch.nn.ELU)
+                self.value_prior_hyper_model = self.gen_prior_model(value_params_inp_dim, value_params_out_dim)
+                self.prior_model['value'] = self.value_prior_hyper_model
             if self.value_normal:
                 self.init_norm['value'], self.target_norm['value'] = [], []
         else:
-            self.prediction_value_network = mlp(encoding_size, fc_value_layers, self.full_support_size)
-
-    def gen_base_model(self, sizes):
-        if len(sizes) < 1:
-            return None
-        layers = []
-        for i in range(len(sizes) - 1):
-            layers += [torch.nn.Linear(sizes[i], sizes[i + 1]), torch.nn.ELU()]
-        return torch.nn.Sequential(*layers)
+            self.prediction_value_network = self.gen_base_model([encoding_size] + fc_value_layers + [self.full_support_size])
 
     def gen_shape_size(self, layers):
         shapes, sizes = [], []
@@ -147,6 +133,15 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             sizes.extend([layers[i] * layers[i+1], layers[i+1]])
         return shapes, sizes
 
+    def gen_base_model(self, sizes, bias=True, output_activation=torch.nn.Identity, activation=torch.nn.ELU):
+        if len(sizes) < 1:
+            return None
+        layers = []
+        for i in range(len(sizes) - 1):
+            act = activation if i < len(sizes) - 2 else output_activation
+            layers += [torch.nn.Linear(sizes[i], sizes[i + 1], bias=bias), act()]
+        return torch.nn.Sequential(*layers)
+
     def gen_prior_model(self, inp_dim, out_dim):
         std = self.config.prior_model_std
         normal_deviates = numpy.random.standard_normal((out_dim, inp_dim)) * std
@@ -154,7 +149,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         prior_B = normal_deviates / radius
         prior_D = numpy.eye(out_dim)
         prior_params = torch.from_numpy(prior_D.dot(prior_B)).float()
-        return torch.nn.Parameter(data=prior_params.T, requires_grad=False)
+        return torch.nn.Parameter(data=prior_params, requires_grad=False)
     
     def representation(self, observation):
         encoded_state = self.representation_network(
@@ -175,7 +170,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         if self.value_hyper:
             value_params = self.value_hyper_model(noise_z)
             if self.value_prior and not self.config.output_prior:
-                value_prior_params = torch.mm(noise_z, self.value_prior_model.to(noise_z.device))
+                value_prior_params = torch.nn.functional.linear(noise_z, self.value_prior_hyper_model.to(noise_z.device))
                 value_params_ = value_params + value_prior_params
             else:
                 value_params_ = value_params
@@ -183,11 +178,11 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             if self.value_normal:
                 if len(self.init_norm['value']) == 0:
                     self.gen_norm(split_params, "value")
-                split_params = self.get_normal_params(split_params, "value")
+                split_params = self.gen_normal_params(split_params, "value")
             hidden_out = self.value_base_model(encoded_state) if self.value_base_model else encoded_state
             value = self.hypermodel_forward(hidden_out, split_params)
             if self.value_prior and self.config.output_prior:
-                value_prior_params = torch.mm(noise_z, self.value_prior_model.to(noise_z.device))
+                value_prior_params = torch.nn.functional.linear(noise_z, self.value_prior_hyper_model.to(noise_z.device))
                 split_params = self.split_params(value_prior_params, "value")
                 prior_hidden_out = self.value_prior_base_model(encoded_state) if self.value_prior_base_model else hidden_out
                 prior_value = self.hypermodel_forward(prior_hidden_out, split_params)
@@ -210,7 +205,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         if self.state_hyper:
             state_params = self.state_hyper_model(noise_z)
             if self.state_prior and not self.config.output_prior:
-                state_prior_params = torch.mm(noise_z, self.state_prior_model.to(noise_z.device))
+                state_prior_params = torch.nn.functional.linear(noise_z, self.state_prior_hyper_model.to(noise_z.device))
                 state_params_ = state_params + state_prior_params
             else:
                 state_params_ = state_params
@@ -218,11 +213,11 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             if self.state_normal:
                 if len(self.init_norm['state']) == 0:
                     self.gen_norm(split_params, "state")
-                split_params = self.get_normal_params(split_params, "state")
+                split_params = self.gen_normal_params(split_params, "state")
             hidden_out = self.state_base_model(x) if self.state_base_model else x
             next_encoded_state = self.hypermodel_forward(hidden_out, split_params)
             if self.state_prior and self.config.output_prior:
-                state_prior_params = torch.mm(noise_z, self.state_prior_model.to(noise_z.device))
+                state_prior_params = torch.nn.functional.linear(noise_z, self.state_prior_hyper_model.to(noise_z.device))
                 split_params = self.split_params(state_prior_params, "state")
                 prior_hidden_out = self.state_prior_base_model(x) if self.state_prior_base_model else hidden_out
                 prior_next_encoded_state = self.hypermodel_forward(prior_hidden_out, split_params)
@@ -234,7 +229,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         if self.reward_hyper:
             reward_params = self.reward_hyper_model(noise_z)
             if self.reward_prior and not self.config.output_prior:
-                reward_prior_params = torch.mm(noise_z, self.reward_prior_model.to(noise_z.device))
+                reward_prior_params = torch.nn.functional.linear(noise_z, self.reward_prior_hyper_model.to(noise_z.device))
                 reward_params_ = reward_params + reward_prior_params
             else:
                 reward_params_ = reward_params
@@ -242,11 +237,11 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             if self.reward_normal:
                 if len(self.init_norm['reward']) == 0:
                     self.gen_norm(split_params, "reward")
-                split_params = self.get_normal_params(split_params, "reward")
+                split_params = self.gen_normal_params(split_params, "reward")
             hidden_out = self.reward_base_model(next_encoded_state) if self.reward_base_model else next_encoded_state
             reward = self.hypermodel_forward(hidden_out, split_params)
             if self.reward_prior and self.config.output_prior:
-                reward_prior_params = torch.mm(noise_z, self.reward_prior_model.to(noise_z.device))
+                reward_prior_params = torch.nn.functional.linear(noise_z, self.reward_prior_hyper_model.to(noise_z.device))
                 split_params = self.split_params(reward_prior_params, "reward")
                 prior_hidden_out = self.reward_prior_base_model(next_encoded_state) if self.reward_prior_base_model else hidden_out
                 prior_reward = self.hypermodel_forward(prior_hidden_out, split_params)
@@ -273,13 +268,6 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             if i != len(params) - 2:
                 inputs = torch.nn.functional.relu(inputs)
         return inputs.squeeze(dim=1)
-
-    def debug(self, noise_z):
-        value_params = self.value_hyper_model(noise_z).t() if self.value_hyper else None
-        state_params = self.state_hyper_model(noise_z).t() if self.state_hyper else None
-        reward_params = self.reward_hyper_model(noise_z).t() if self.reward_hyper else None
-
-        return {"value_params": value_params, "reward_params": reward_params, "state_params": state_params, }
 
     def initial_inference(self, observation, noise_z):
         if not self.config.use_representation and self.config.stacked_observations == 0:
@@ -313,27 +301,29 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             params_splited.append(param.reshape((-1,) + shape))
         return params_splited
 
-    def get_normal_params(self, params, normal_type):
+    def gen_normal_params(self, params, normal_type):
         init_norm = self.init_norm[normal_type]
         target_norm = self.target_norm[normal_type]
         gain = 1.
         for i, param in enumerate(params):
             if param.shape[1] == 1:
                 continue
-            param *= gain * target_norm[i] / init_norm[i]
+            param *= gain * target_norm[i // 2] / init_norm[i // 2]
         return params
 
     def gen_norm(self, params, norm_type):
         print(f"gen {norm_type} norm!")
         init_norm, target_norm = [], []
         for param in params:
+            if param.shape[1] == 1:
+                continue
             init_norm.append(torch.norm(param).detach().numpy())
             target_norm.append(torch.norm(torch.nn.init.xavier_normal_(
                 torch.empty(size=param.size()))).detach().numpy())
         self.init_norm[norm_type] = init_norm
         self.target_norm[norm_type] = target_norm
 
-    def get_hypermodel(self,):
+    def get_hypermodel_std(self,):
         hypermodel_std = dict()
         hypermodel_std["value_params.weight"] = \
             self.calculation_std(self.value_hyper_model.weight) if self.value_hyper else 0
@@ -347,17 +337,8 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         std = torch.sum(torch.diag(torch.mm(params, params.t()))).cpu()
         return std.detach().numpy()
 
-
-def mlp(
-    input_size,
-    layer_sizes,
-    output_size,
-    output_activation=torch.nn.Identity,
-    activation=torch.nn.ELU,
-):
-    sizes = [input_size] + layer_sizes + [output_size]
-    layers = []
-    for i in range(len(sizes) - 1):
-        act = activation if i < len(sizes) - 2 else output_activation
-        layers += [torch.nn.Linear(sizes[i], sizes[i + 1]), act()]
-    return torch.nn.Sequential(*layers)
+    def debug(self, noise_z):
+        value_params = self.value_hyper_model(noise_z).t() if self.value_hyper else None
+        state_params = self.state_hyper_model(noise_z).t() if self.state_hyper else None
+        reward_params = self.reward_hyper_model(noise_z).t() if self.reward_hyper else None
+        return {"value_params": value_params, "reward_params": reward_params, "state_params": state_params, }
