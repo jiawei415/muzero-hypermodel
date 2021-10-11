@@ -78,7 +78,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             state_params_out_dim = sum(self.splited_sizes['state'])
             self.state_hyper_model = torch.nn.Linear(state_params_inp_dim, state_params_out_dim)
             if self.state_prior:
-                self.state_prior_base_model = self.gen_base_model(base_model_sizes if config.use_prior_basemodel else [], bias=False, output_activation=torch.nn.ELU)
+                self.state_prior_base_model = self.gen_base_model(base_model_sizes if config.use_prior_basemodel else [], output_activation=torch.nn.ELU)
                 self.state_prior_hyper_model = LinearPriorNet(state_params_inp_dim, state_params_out_dim, prior_std=self.config.prior_model_std)
                 # self.state_prior_hyper_model = self.gen_prior_model(state_params_inp_dim, state_params_out_dim)
                 self.prior_model['state'] = self.state_prior_hyper_model
@@ -99,7 +99,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             reward_params_out_dim = sum(self.splited_sizes['reward'])
             self.reward_hyper_model = torch.nn.Linear(reward_params_inp_dim, reward_params_out_dim)
             if self.reward_prior:
-                self.reward_prior_base_model = self.gen_base_model(base_model_sizes if config.use_prior_basemodel else [], bias=False, output_activation=torch.nn.ELU)
+                self.reward_prior_base_model = self.gen_base_model(base_model_sizes if config.use_prior_basemodel else [], output_activation=torch.nn.ELU)
                 self.reward_prior_hyper_model = LinearPriorNet(reward_params_inp_dim, reward_params_out_dim, prior_std=self.config.prior_model_std)
                 # self.reward_prior_hyper_model = self.gen_prior_model(reward_params_inp_dim, reward_params_out_dim)
                 self.prior_model['reward'] = self.reward_prior_hyper_model
@@ -120,7 +120,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
             value_params_out_dim = sum(self.splited_sizes['value'])
             self.value_hyper_model = torch.nn.Linear(value_params_inp_dim, value_params_out_dim)
             if self.value_prior:
-                self.value_prior_base_model = self.gen_base_model(base_model_sizes if config.use_prior_basemodel else [], bias=False, output_activation=torch.nn.ELU)
+                self.value_prior_base_model = self.gen_base_model(base_model_sizes if config.use_prior_basemodel else [], output_activation=torch.nn.ELU)
                 self.value_prior_hyper_model = LinearPriorNet(value_params_inp_dim, value_params_out_dim, prior_std=self.config.prior_model_std)
                 # self.value_prior_hyper_model = self.gen_prior_model(value_params_inp_dim, value_params_out_dim)
                 self.prior_model['value'] = self.value_prior_hyper_model

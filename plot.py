@@ -73,7 +73,7 @@ except:
     time_tag = "2021091401"
 game_name = "deepsea"
 action_num = 3
-debug_action_history = False
+debug_action_history = True
 log_path = f"./results/{game_name}/{time_tag}"
 titles = {"+hyper": "hypermodel", "+prior": "priormodel", "+normal": "normalization", "+target": "target_noise", "+reg": "use_reg_loss"}
 
@@ -211,7 +211,7 @@ plot_all(played_step, value_mean_datas, action_mean_datas, scalars)
 
 if game_name == "deepsea" and debug_action_history:
     for root, dirs, files in os.walk(log_path):
-        if len(files) != 0:
+        if len(files) != 0 and 'model_best.checkpoint' in files:
             title = "muzero"
             config = pd.read_csv(os.path.join(root, 'config_logs.csv'), sep="\t")
             title += "_p" if eval(config[config.key == "PER"].value.to_list()[0]) else "_np"
@@ -240,10 +240,11 @@ if game_name == "deepsea" and debug_action_history:
             debug_logs = pd.read_csv(os.path.join(root, 'debug_logs.csv'), sep="\t")
             best_score = float('-inf')
             best_actions = np.ones(int(size))
+            print(f"action_right: {action_right}")
             for item in debug_logs['action_history']:
-                now_actions = np.array(eval(item)[0])
+                now_actions = np.array(eval(item))
                 now_score = np.sum(now_actions == action_right)
                 if now_score > best_score:
                     best_score = now_score
                     best_actions = now_actions
-                    print(f"action_right: {action_right} \nbest_actions: {best_actions} score: {best_score}")
+                    print(f"best_actions: {best_actions} score: {best_score}")
