@@ -15,7 +15,7 @@ mcts_value_mean, target_model_value_mean, model_value_mean = {}, {}, {}
 player_datas = {
     "played_steps": played_step,
     "training_steps": training_step,
-    "test_total_reward": test_reward
+    "train_total_reward": test_reward
 }
 loss_datas = {
     "total_loss": total_loss,
@@ -70,9 +70,10 @@ def gen_ydata(ys, min_len, weight):
 try:
     time_tag = f"2021{sys.argv[1]}"
 except:
-    time_tag = "2021091401"
+    time_tag = "2021101101"
 game_name = "deepsea"
 action_num = 3
+action_right = -1
 debug_action_history = True
 log_path = f"./results/{game_name}/{time_tag}"
 titles = {"+hyper": "hypermodel", "+prior": "priormodel", "+normal": "normalization", "+target": "target_noise", "+reg": "use_reg_loss"}
@@ -83,6 +84,9 @@ for root, dirs, files in os.walk(log_path):
     if len(files) != 0:
         if 'config_logs.csv' not in files:
             continue
+        if 'model_best.checkpoint' in files:
+            checkpoint = torch.load(os.path.join(root, 'model_best.checkpoint'))
+            action_right = np.diagonal(checkpoint['action_mapping']).astype(np.int32)[0]
         title = "muzero"
         config = pd.read_csv(os.path.join(root, 'config_logs.csv'), sep="\t")
         title += "_p" if eval(config[config.key == "PER"].value.to_list()[0]) else "_np"
@@ -96,10 +100,11 @@ for root, dirs, files in os.walk(log_path):
                 title += k
         # seed = config[config.key == "seed"].value.to_list()[0]
         prior_model_std = config[config.key == "prior_model_std"].value.to_list()[0]
+        train_proportion = config[config.key == "train_proportion"].value.to_list()[0]
         use_last_layer = config[config.key == "use_last_layer"].value.to_list()[0] if "use_last_layer" in config['key'].values else False
         output_prior = config[config.key == "output_prior"].value.to_list()[0] if "output_prior" in config['key'].values else False
         use_prior_basemodel = config[config.key == "use_prior_basemodel"].value.to_list()[0] if "use_prior_basemodel" in config['key'].values else False
-        label = title + f"\t prior_model_std: {prior_model_std} use_last_layer: {use_last_layer} output_prior: {output_prior} use_prior_basemodel: {use_prior_basemodel}"
+        label = title + f"\t prior_model_std: {prior_model_std} train_proportion: {train_proportion} use_last_layer: {use_last_layer} output_prior: {output_prior} use_prior_basemodel: {use_prior_basemodel}"
         # play_with_improve = config[config.key == "play_with_improve"].value.to_list()[0] if "play_with_improve" in config['key'].values else False
         # learn_with_improve = config[config.key == "learn_with_improve"].value.to_list()[0] if "learn_with_improve" in config['key'].values else False
         # search_with_improve = config[config.key == "search_with_improve"].value.to_list()[0] if "search_with_improve" in config['key'].values else False
@@ -132,6 +137,13 @@ for root, dirs, files in os.walk(log_path):
         for (k, v), (k_mean, v_mean) in zip(action_datas.items(), action_mean_datas.items()):
             if k in debug_logs.columns:
                 v[label] = [[], [], []]
+                if action_right != -1:
+                    if '0' in k:
+                        k = k.replace('0', str(1 - action_right))
+                        k_mean = k_mean.replace('0', str(1 - action_right))
+                    elif '1' in k:
+                        k = k.replace('1', str(action_right))
+                        k_mean = k_mean.replace('1', str(action_right))
                 for prob in debug_logs[k]:
                     data = np.array(eval(prob))
                     v[label][0].append(np.min(data))
@@ -171,9 +183,16 @@ def plot_all(xs, value, action, scalar):
             axes[0].set_xlim([min(x)-10, max(x)+10])
             axes[0].grid()
         for i, (action_name, action_data) in enumerate(action.items()):
+            if game_name == 'deepsea':
+                if '0' in action_name:
+                    action_label = 'action_left'
+                elif '1' in action_name:
+                    action_label = 'action_right'
+            else:
+                action_label = action_name
             if action_data != {}:
                 y, y_min, y_max = gen_ydata(action_data[label], min_len, weight)
-                axes[1].plot(x, y, color=COLORS[i+3], label=action_name)
+                axes[1].plot(x, y, color=COLORS[i+3], label=action_label)
                 axes[1].fill_between(x, y_min, y_max, color=COLORS[i+3], alpha=0.2)
             axes[1].legend(loc='upper left', handlelength=5, borderpad=1.2, labelspacing=1.2)
             axes[1].set_ylabel('action probability')
@@ -244,7 +263,7 @@ if game_name == "deepsea" and debug_action_history:
             for item in debug_logs['action_history']:
                 now_actions = np.array(eval(item))
                 now_score = np.sum(now_actions == action_right)
-                if now_score > best_score:
+                if now_score >= best_score:
                     best_score = now_score
                     best_actions = now_actions
                     print(f"best_actions: {best_actions} score: {best_score}")
