@@ -23,7 +23,7 @@ loss_datas = {
     "reward_loss": reward_loss,
     "policy_loss": policy_loss,
 }
-debug_datas = {
+params_datas = {
     "value_params.weight": value_params_std,
     "reward_params.weight": reward_params_std,
     "state_params.weight": state_params_std,
@@ -68,15 +68,24 @@ def gen_ydata(ys, min_len, weight):
     return y, y_min, y_max
 
 try:
-    time_tag = f"2021{sys.argv[1]}"
+    game_name = sys.argv[1]
+except:
+    game_name = "deepsea"
+try:
+    time_tag = f"2021{sys.argv[2]}"
 except:
     time_tag = "2021101101"
-game_name = "deepsea"
+
 action_num = 3
 action_right = -1
 debug_action_history = True
 log_path = f"./results/{game_name}/{time_tag}"
+
 titles = {"+hyper": "hypermodel", "+prior": "priormodel", "+normal": "normalization", "+target": "target_noise", "+reg": "use_reg_loss"}
+labels = []
+labels += ["train_proportion", "train_frequency", "hyper_inp_dim", "prior_model_std"]
+# labels += ["output_prior", "use_prior_basemodel"]
+# labels += ["play_with_improve", "learn_with_improve", "search_with_improve"]
 
 for root, dirs, files in os.walk(log_path):
     for name in dirs:
@@ -98,22 +107,15 @@ for root, dirs, files in os.walk(log_path):
             conf = eval(config[config.key == v].value.to_list()[0])
             if (isinstance(conf, list) and 1 in conf) or (isinstance(conf, bool) and conf):
                 title += k
-        # seed = config[config.key == "seed"].value.to_list()[0]
-        prior_model_std = config[config.key == "prior_model_std"].value.to_list()[0]
-        train_proportion = config[config.key == "train_proportion"].value.to_list()[0]
-        use_last_layer = config[config.key == "use_last_layer"].value.to_list()[0] if "use_last_layer" in config['key'].values else False
-        output_prior = config[config.key == "output_prior"].value.to_list()[0] if "output_prior" in config['key'].values else False
-        use_prior_basemodel = config[config.key == "use_prior_basemodel"].value.to_list()[0] if "use_prior_basemodel" in config['key'].values else False
-        label = title + f"\t prior_model_std: {prior_model_std} train_proportion: {train_proportion} use_last_layer: {use_last_layer} output_prior: {output_prior} use_prior_basemodel: {use_prior_basemodel}"
-        # play_with_improve = config[config.key == "play_with_improve"].value.to_list()[0] if "play_with_improve" in config['key'].values else False
-        # learn_with_improve = config[config.key == "learn_with_improve"].value.to_list()[0] if "learn_with_improve" in config['key'].values else False
-        # search_with_improve = config[config.key == "search_with_improve"].value.to_list()[0] if "search_with_improve" in config['key'].values else False
-        # label = title + f"\t use_last_layer: {use_last_layer} base_weight_decay: {base_weight_decay} play: {play_with_improve} learn: {learn_with_improve} search: {search_with_improve}"
+        label = f"{title}\t"
+        for key in labels:
+            val = config[config.key == key].value.to_list()[0] if key in config['key'].values else False
+            label += f" {key}: {val}"
         if game_name == "deepsea":
             size = config[config.key == "size"].value.to_list()[0]
-            deterministic = config[config.key == "deterministic"].value.to_list()[0] if "deterministic" in config['key'].values else True
+            # deterministic = config[config.key == "deterministic"].value.to_list()[0] if "deterministic" in config['key'].values else True
             randomize_actions = config[config.key == "randomize_actions"].value.to_list()[0] if "randomize_actions" in config['key'].values else False
-            label += f" size: {size} deterministic: {deterministic} randomize_actions: {randomize_actions}"
+            label += f" size: {size} randomize_actions: {randomize_actions}"
         debug_logs = pd.read_csv(os.path.join(root, 'debug_logs.csv'), sep="\t")
         player_logs = pd.read_csv(os.path.join(root, 'palyer_logs.csv'), sep="\t")
         for k, v in player_datas.items():
@@ -129,7 +131,7 @@ for root, dirs, files in os.walk(log_path):
                     v[label].append(data[start+1:])
                 else:
                     v[label] = [data[start+1:]]
-        for k, v in debug_datas.items():
+        for k, v in params_datas.items():
             if label in v.keys():
                 v[label].append(debug_logs[k].to_numpy())
             else:
@@ -242,17 +244,15 @@ if game_name == "deepsea" and debug_action_history:
                 conf = eval(config[config.key == v].value.to_list()[0])
                 if (isinstance(conf, list) and 1 in conf) or (isinstance(conf, bool) and conf):
                     title += k
-            seed = config[config.key == "seed"].value.to_list()[0]
-            size = config[config.key == "size"].value.to_list()[0]
-            deterministic = config[config.key == "deterministic"].value.to_list()[0] if "deterministic" in config['key'].values else True
             randomize_actions = config[config.key == "randomize_actions"].value.to_list()[0] if "randomize_actions" in config['key'].values else False
-            use_last_layer = config[config.key == "use_last_layer"].value.to_list()[0] if "use_last_layer" in config['key'].values else False
-            output_prior = config[config.key == "output_prior"].value.to_list()[0] if "output_prior" in config['key'].values else False
-            use_prior_basemodel = config[config.key == "use_prior_basemodel"].value.to_list()[0] if "use_prior_basemodel" in config['key'].values else False
-            label = title + f"\t seed: {seed} size: {size} randomize_actions: {randomize_actions}"
-            label += f" use_last_layer: {use_last_layer} output_prior: {output_prior} use_prior_basemodel: {use_prior_basemodel}"
             if not eval(randomize_actions):
                 continue
+            seed = config[config.key == "seed"].value.to_list()[0]
+            size = config[config.key == "size"].value.to_list()[0]
+            label = title + f"\t seed: {seed} size: {size}"
+            for key in labels:
+                val = config[config.key == key].value.to_list()[0] if key in config['key'].values else False
+                label += f" {key}: {val}"
             checkpoint = torch.load(os.path.join(root, 'model_best.checkpoint'))
             action_right = np.diagonal(checkpoint['action_mapping']).astype(np.int32)
             print(f"label: {label}")
