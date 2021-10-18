@@ -147,14 +147,14 @@ class Trainer:
 
         # Scale the value loss, paper recommends by 0.25 (See paper appendix Reanalyze)
         loss = value_loss * self.config.value_loss_weight + reward_loss + policy_loss
-        if self.config.use_reg_loss:
-            reg_loss = self.regularization_loss([value_params, reward_params, state_params])
-            loss += self.config.regularization_coef(played_steps) * reg_loss
         if self.config.PER:
             # Correct PER bias by using importance-sampling (IS) weights
             loss *= weight_batch
         # Mean over batch dimension (pseudocode do a sum)
         loss = loss.mean()
+        if self.config.use_reg_loss:
+            reg_loss = self.regularization_loss([value_params, reward_params, state_params])
+            loss += self.config.regularization_coef(played_steps) * reg_loss
         # Optimize
         self.optimizer.zero_grad()
         loss.backward()
@@ -197,5 +197,5 @@ class Trainer:
         reg_loss = 0
         for param in params:
             if param is not None:
-                reg_loss += torch.norm(param, p=p).square()
-        return reg_loss
+                reg_loss += torch.norm(param, dim=1, p=p).square()
+        return reg_loss.mean()

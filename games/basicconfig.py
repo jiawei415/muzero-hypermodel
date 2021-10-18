@@ -17,7 +17,7 @@ class BasicConfig():
         self.output_prior = True
         
         # Based Config
-        self.reg_loss_scale = 0.001
+        self.reg_loss_scale = 0.1
         self.prior_model_std = 1
         self.normal_noise_std = 1
         self.target_noise_std = 0.1
