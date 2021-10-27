@@ -15,7 +15,7 @@ mcts_value_mean, target_model_value_mean, model_value_mean = {}, {}, {}
 player_datas = {
     "played_steps": played_step,
     "training_steps": training_step,
-    "train_total_reward": test_reward
+    "test_total_reward": test_reward
 }
 loss_datas = {
     "total_loss": total_loss,
@@ -83,7 +83,8 @@ log_path = f"./results/{game_name}/{time_tag}"
 
 titles = {"+hyper": "hypermodel", "+prior": "priormodel", "+normal": "normalization", "+target": "target_noise", "+reg": "use_reg_loss"}
 labels = []
-labels += ["train_proportion", "train_frequency", "hyper_inp_dim", "prior_model_std"]
+labels += ["reg_loss_scale", "base_weight_decay", "hyper_weight_decay"]
+# labels += ["train_proportion", "train_frequency", "num_unroll_steps", "hyper_inp_dim", "prior_model_std"]
 # labels += ["output_prior", "use_prior_basemodel"]
 # labels += ["play_with_improve", "learn_with_improve", "search_with_improve"]
 
@@ -257,6 +258,7 @@ if game_name == "deepsea" and debug_action_history:
             action_right = np.diagonal(checkpoint['action_mapping']).astype(np.int32)
             print(f"label: {label}")
             debug_logs = pd.read_csv(os.path.join(root, 'debug_logs.csv'), sep="\t")
+            success_num = 0
             best_score = float('-inf')
             best_actions = np.ones(int(size))
             print(f"action_right: {action_right}")
@@ -266,4 +268,7 @@ if game_name == "deepsea" and debug_action_history:
                 if now_score >= best_score:
                     best_score = now_score
                     best_actions = now_actions
-                    print(f"best_actions: {best_actions} score: {best_score}")
+                    # print(f"best_actions: {best_actions} score: {best_score}")
+                if now_score == int(size):
+                    success_num += 1
+            print(f"success_num: {success_num}")
