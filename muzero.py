@@ -417,8 +417,8 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--game', type=str, default="deepsea",
                         help='game name')
-    parser.add_argument('--config', type=str, default="{}",
-                        help="game config eg., {'train_frequency':10,'hypermodel':[0,1,1],'use_last_layer':True,'use_prior_basemodel':False}")
+    parser.add_argument('--config', type=str, default="{'train_frequency':10,'hypermodel':[0,1,1],'use_reg_loss':True}",
+                        help="game config eg., {}")
     parser.add_argument('--ckpt-path', type=str, default="",
                         help="checkpoint path for evaluation")
     parser.add_argument('--render', default=False, action='store_true')
