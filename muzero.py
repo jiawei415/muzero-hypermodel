@@ -38,7 +38,6 @@ class MuZero:
             "optimizer_state": None,
             "init_norm": None,
             "target_norm": None,
-            "prior_model": None,
             "train_total_reward": 0,
             "train_episode_length": 0,
             "train_mean_value": 0,
@@ -77,8 +76,8 @@ class MuZero:
                 print(f'unrecognized config k: {k}, v: {v}, ignored')
                 continue
             self.config.__dict__[k] = v
-        if self.config.use_priormodel: self.config.priormodel = copy.deepcopy(self.config.hypermodel)
-        if self.config.use_normalization: self.config.normalization = copy.deepcopy(self.config.hypermodel)
+        # if self.config.use_priormodel: self.config.priormodel = copy.deepcopy(self.config.hypermodel)
+        # if self.config.use_normalization: self.config.normalization = copy.deepcopy(self.config.hypermodel)
         if self.config.use_target_noise: self.config.target_noise = copy.deepcopy(self.config.hypermodel)
         if self.config.use_value_target_noise: self.config.target_noise[0] = 1
         if game_name == "deepsea": self.config.observation_shape = (1, 1, self.config.size**2)
@@ -342,7 +341,6 @@ class MuZero:
                 ),
                 "init_norm": copy.deepcopy(self.model.init_norm),
                 "target_norm": copy.deepcopy(self.model.target_norm),
-                "prior_model": copy.deepcopy(self.model.prior_model),
             }
         )
         if self.config.save_model:
@@ -355,7 +353,6 @@ class MuZero:
         self.model.set_weights(self.checkpoint["weights"])
         self.model.init_norm = self.checkpoint["init_norm"]
         self.model.target_norm = self.checkpoint["target_norm"]
-        self.model.prior_model = self.checkpoint["prior_model"]
         self.record_worker = self_play.RecordPlay(self.model, self.game, self.config)
         total_reward = self.record_worker.start_record(render=render)
         print(f"total reward: {total_reward}")
@@ -367,17 +364,11 @@ class Actor:
     def initial_model(self):
         device = "cuda" if torch.cuda.is_available() else "cpu"
         model = models.MuZeroNetwork(self.config).to(device)
-        for name, param in model.named_parameters():
-            if 'prior' in name:
-                param.requires_grad = False
         target_model = models.MuZeroNetwork(self.config).to(device)
         weigths = model.get_weights()
+        target_model.set_weights(weigths)
         summary = str(model).replace("\n", " \n\n")
         print(f"{str(model)}")
-        target_model.set_weights(weigths)
-        target_model.init_norm = model.init_norm
-        target_model.target_norm = model.target_norm
-        target_model.prior_model = model.prior_model
         if "cuda" not in str(next(model.parameters()).device):
             print("You are not training on GPU.\n")
         return model, target_model, weigths, summary
@@ -418,7 +409,7 @@ def get_args():
     parser.add_argument('--game', type=str, default="deepsea",
                         help='game name')
     parser.add_argument('--config', type=str, default="{}",
-                        help="game config eg., {'train_frequency':10,'hypermodel':[0,1,1],'use_last_layer':True,'use_prior_basemodel':False}")
+                        help="game config eg., {'size':10,'hypermodel':[0,1,1],'use_last_layer':True,'use_reg_loss':True}")
     parser.add_argument('--ckpt-path', type=str, default="",
                         help="checkpoint path for evaluation")
     parser.add_argument('--render', default=False, action='store_true')

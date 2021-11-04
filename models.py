@@ -1,10 +1,7 @@
 import torch
 import numpy
+from functools import reduce
 from abc import ABC, abstractmethod
-
-class MuZeroNetwork:
-    def __new__(cls, config):
-        return MuZeroFullyConnectedNetwork(config)
 
 
 def dict_to_cpu(dictionary):
@@ -17,6 +14,10 @@ def dict_to_cpu(dictionary):
         else:
             cpu_dict[key] = value
     return cpu_dict
+
+
+def products(inputs):
+    return reduce(lambda x, y: x * y, inputs)
 
 
 class AbstractNetwork(ABC, torch.nn.Module):
@@ -39,6 +40,11 @@ class AbstractNetwork(ABC, torch.nn.Module):
         self.load_state_dict(weights)
 
 
+class MuZeroNetwork:
+    def __new__(cls, config):
+        return MuZeroFullyConnectedNetwork(config)
+
+
 class MuZeroFullyConnectedNetwork(AbstractNetwork):
     def __init__(self, config):
         super().__init__()
@@ -52,9 +58,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         fc_dynamics_layers = config.fc_dynamics_layers
         self.action_space_size = len(config.action_space)
         self.full_support_size = 2 * config.support_size + 1
-        self.value_prior, self.reward_prior, self.state_prior = config.priormodel
         self.value_hyper, self.reward_hyper, self.state_hyper = config.hypermodel
-        self.value_normal, self.reward_normal, self.state_normal = config.normalization
         self.init_norm, self.target_norm, self.prior_model = {}, {}, {}
         self.splited_shapes, self.splited_sizes = {}, {}
         self.config = config
@@ -62,100 +66,49 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         if not self.config.use_representation and self.config.stacked_observations == 0:
             encoding_size = self.config.observation_shape[-1]
         else:
-            self.representation_network = self.gen_base_model(
-                    [observation_shape[0] * observation_shape[1] * observation_shape[2] * (stacked_observations + 1)
-                    + stacked_observations * observation_shape[1] * observation_shape[2]]
-                    + fc_representation_layers + [encoding_size]
-                )
+            representation_input_size = products(observation_shape) * (stacked_observations + 1) + products(observation_shape[1:]) * stacked_observations
+            self.representation_network = LinearBasedNet([representation_input_size] + fc_representation_layers + [encoding_size])
 
+        state_layers = [encoding_size + self.action_space_size] + fc_dynamics_layers + [encoding_size]
         if self.state_hyper:
             print(f"use dynamics state hypermodel!")
-            sizes = [encoding_size + self.action_space_size] + fc_dynamics_layers + [encoding_size]
-            base_model_sizes, hyper_model_sizes = (sizes[:-1], sizes[-2:]) if config.use_last_layer else ([], sizes)
-            self.state_base_model = self.gen_base_model(base_model_sizes, output_activation=torch.nn.ELU)
-            self.splited_shapes['state'], self.splited_sizes['state'] = self.gen_shape_size(hyper_model_sizes)
-            state_params_inp_dim = config.hyper_inp_dim
-            state_params_out_dim = sum(self.splited_sizes['state'])
-            self.state_hyper_model = torch.nn.Linear(state_params_inp_dim, state_params_out_dim)
-            if self.state_prior:
-                self.state_prior_base_model = self.gen_base_model(base_model_sizes if config.use_prior_basemodel else [], output_activation=torch.nn.ELU)
-                self.state_prior_hyper_model = LinearPriorNet(state_params_inp_dim, state_params_out_dim, prior_std=self.config.prior_model_std)
-                # self.state_prior_hyper_model = self.gen_prior_model(state_params_inp_dim, state_params_out_dim)
-                self.prior_model['state'] = self.state_prior_hyper_model
-            if self.state_normal:
-                self.init_norm['state'], self.target_norm['state'] = [], []
+            if config.use_last_layer:
+                self.state_basedmodel = LinearBasedNet(state_layers[:-1], prior=config.use_priormodel, output_activation=torch.nn.ELU)
+                self.state_hypermodel = LinearHyperNet(config.hyper_inp_dim, state_layers[-2:], config.use_priormodel, prior_std=config.prior_model_std)
+            else:
+                self.state_basedmodel = None
+                self.state_hypermodel = LinearHyperNet(config.hyper_inp_dim, state_layers, config.use_priormodel, prior_std=config.prior_model_std)
         else:
-            self.dynamics_encoded_state_network = self.gen_base_model(
-                    [encoding_size + self.action_space_size] + fc_dynamics_layers + [encoding_size]
-                )
+            self.dynamics_encoded_state_network = LinearBasedNet(state_layers)
 
+        reward_layers = [encoding_size] + fc_reward_layers + [self.full_support_size]
         if self.reward_hyper:
             print(f"use dynamics reward hypermodel!")
-            sizes = [encoding_size] + fc_reward_layers + [self.full_support_size]
-            base_model_sizes, hyper_model_sizes = (sizes[:-1], sizes[-2:]) if config.use_last_layer else ([], sizes)
-            self.reward_base_model = self.gen_base_model(base_model_sizes, output_activation=torch.nn.ELU)
-            self.splited_shapes['reward'], self.splited_sizes['reward'] = self.gen_shape_size(hyper_model_sizes)
-            reward_params_inp_dim = config.hyper_inp_dim
-            reward_params_out_dim = sum(self.splited_sizes['reward'])
-            self.reward_hyper_model = torch.nn.Linear(reward_params_inp_dim, reward_params_out_dim)
-            if self.reward_prior:
-                self.reward_prior_base_model = self.gen_base_model(base_model_sizes if config.use_prior_basemodel else [], output_activation=torch.nn.ELU)
-                self.reward_prior_hyper_model = LinearPriorNet(reward_params_inp_dim, reward_params_out_dim, prior_std=self.config.prior_model_std)
-                # self.reward_prior_hyper_model = self.gen_prior_model(reward_params_inp_dim, reward_params_out_dim)
-                self.prior_model['reward'] = self.reward_prior_hyper_model
-            if self.reward_normal:
-                self.init_norm['reward'], self.target_norm['reward'] = [], []
+            if config.use_last_layer:
+                self.reward_basedmodel = LinearBasedNet(reward_layers[:-1], prior=config.use_priormodel, output_activation=torch.nn.ELU)
+                self.reward_hypermodel = LinearHyperNet(config.hyper_inp_dim, reward_layers[-2:], config.use_priormodel, prior_std=config.prior_model_std)
+            else:
+                self.reward_basedmodel = None
+                self.reward_hypermodel = LinearHyperNet(config.hyper_inp_dim, reward_layers, config.use_priormodel, prior_std=config.prior_model_std)
         else:
-            self.dynamics_reward_network =  self.gen_base_model([encoding_size] + fc_reward_layers + [self.full_support_size])
+            self.dynamics_reward_network = LinearBasedNet(reward_layers)
 
-        self.prediction_policy_network = self.gen_base_model([encoding_size] + fc_policy_layers + [self.action_space_size])
-
+        value_layers = [encoding_size] + fc_value_layers + [self.full_support_size]
         if self.value_hyper:
             print(f"use prediction value hypermodel!")
-            sizes = [encoding_size] + fc_value_layers + [self.full_support_size]
-            base_model_sizes, hyper_model_sizes = (sizes[:-1], sizes[-2:]) if config.use_last_layer else ([], sizes)
-            self.value_base_model = self.gen_base_model(base_model_sizes, output_activation=torch.nn.ELU)
-            self.splited_shapes['value'], self.splited_sizes['value'] = self.gen_shape_size(hyper_model_sizes)
-            value_params_inp_dim = config.hyper_inp_dim
-            value_params_out_dim = sum(self.splited_sizes['value'])
-            self.value_hyper_model = torch.nn.Linear(value_params_inp_dim, value_params_out_dim)
-            if self.value_prior:
-                self.value_prior_base_model = self.gen_base_model(base_model_sizes if config.use_prior_basemodel else [], output_activation=torch.nn.ELU)
-                self.value_prior_hyper_model = LinearPriorNet(value_params_inp_dim, value_params_out_dim, prior_std=self.config.prior_model_std)
-                # self.value_prior_hyper_model = self.gen_prior_model(value_params_inp_dim, value_params_out_dim)
-                self.prior_model['value'] = self.value_prior_hyper_model
-            if self.value_normal:
-                self.init_norm['value'], self.target_norm['value'] = [], []
+            if config.use_last_layer:
+                self.value_basedmodel = LinearBasedNet(value_layers[:-1], prior=config.use_priormodel, output_activation=torch.nn.ELU)
+                self.value_hypermodel = LinearHyperNet(config.hyper_inp_dim, value_layers[-2:], config.use_priormodel, prior_std=config.prior_model_std)
+            else:
+                self.value_basedmodel = None
+                self.value_hypermodel = LinearHyperNet(config.hyper_inp_dim, value_layers, config.use_priormodel, prior_std=config.prior_model_std)
         else:
-            self.prediction_value_network = self.gen_base_model([encoding_size] + fc_value_layers + [self.full_support_size])
+            self.prediction_value_network = LinearBasedNet(value_layers)
 
-    def gen_shape_size(self, layers):
-        shapes, sizes = [], []
-        for i in range(len(layers)-1):
-            shapes.extend([(layers[i], layers[i+1]), (1, layers[i+1])])
-            sizes.extend([layers[i] * layers[i+1], layers[i+1]])
-        return shapes, sizes
+        self.prediction_policy_network = LinearBasedNet([encoding_size] + fc_policy_layers + [self.action_space_size])
 
-    def gen_base_model(self, sizes, bias=True, output_activation=torch.nn.Identity, activation=torch.nn.ELU):
-        if len(sizes) < 1:
-            return None
-        layers = []
-        for i in range(len(sizes) - 1):
-            act = activation if i < len(sizes) - 2 else output_activation
-            layers += [torch.nn.Linear(sizes[i], sizes[i + 1], bias=bias), act()]
-        return torch.nn.Sequential(*layers)
-
-    def gen_prior_model(self, inp_dim, out_dim):
-        std = self.config.prior_model_std
-        normal_deviates = numpy.random.standard_normal((out_dim, inp_dim)) * std
-        radius = numpy.linalg.norm(normal_deviates, axis=1, keepdims=True)
-        prior_B = normal_deviates / radius
-        prior_D = numpy.eye(out_dim)
-        prior_params = torch.from_numpy(prior_D.dot(prior_B)).float()
-        return torch.nn.Parameter(data=prior_params, requires_grad=False)
-    
     def representation(self, observation):
-        encoded_state = self.representation_network(
+        encoded_state, _ = self.representation_network(
             observation.view(observation.shape[0], -1)
         )
         # Scale encoded state between [0, 1] (See appendix paper Training)
@@ -169,31 +122,12 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         return encoded_state_normalized
 
     def prediction(self, encoded_state, noise_z):
-        policy_logits = self.prediction_policy_network(encoded_state)
+        policy_logits, _ = self.prediction_policy_network(encoded_state)
         if self.value_hyper:
-            value_params = self.value_hyper_model(noise_z)
-            if self.value_prior and not self.config.output_prior:
-                # value_prior_params = torch.nn.functional.linear(noise_z, self.value_prior_hyper_model.to(noise_z.device))
-                value_prior_params = self.value_prior_hyper_model(noise_z)
-                value_params_ = value_params + value_prior_params
-            else:
-                value_params_ = value_params
-            split_params = self.split_params(value_params_, "value")
-            if self.value_normal:
-                if len(self.init_norm['value']) == 0:
-                    self.gen_norm(split_params, "value")
-                split_params = self.gen_normal_params(split_params, "value")
-            hidden_out = self.value_base_model(encoded_state) if self.value_base_model else encoded_state
-            value = self.hypermodel_forward(hidden_out, split_params)
-            if self.value_prior and self.config.output_prior:
-                # value_prior_params = torch.nn.functional.linear(noise_z, self.value_prior_hyper_model.to(noise_z.device))
-                value_prior_params = self.value_prior_hyper_model(noise_z)
-                split_params = self.split_params(value_prior_params, "value")
-                prior_hidden_out = self.value_prior_base_model(encoded_state) if self.value_prior_base_model else hidden_out
-                prior_value = self.hypermodel_forward(prior_hidden_out, split_params)
-                value += prior_value
+            hidden_out, prior_hidden_out = self.value_basedmodel(encoded_state) if self.value_basedmodel else (encoded_state, None)
+            value, value_params = self.value_hypermodel(noise_z, hidden_out, prior_hidden_out)
         else:
-            value = self.prediction_value_network(encoded_state)
+            value, _ = self.prediction_value_network(encoded_state)
             value_params = None
         return policy_logits, value, value_params
  
@@ -208,55 +142,17 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         x = torch.cat((encoded_state, action_one_hot), dim=1)
 
         if self.state_hyper:
-            state_params = self.state_hyper_model(noise_z)
-            if self.state_prior and not self.config.output_prior:
-                # state_prior_params = torch.nn.functional.linear(noise_z, self.state_prior_hyper_model.to(noise_z.device))
-                state_prior_params = self.state_prior_hyper_model(noise_z)
-                state_params_ = state_params + state_prior_params
-            else:
-                state_params_ = state_params
-            split_params = self.split_params(state_params_, "state")
-            if self.state_normal:
-                if len(self.init_norm['state']) == 0:
-                    self.gen_norm(split_params, "state")
-                split_params = self.gen_normal_params(split_params, "state")
-            hidden_out = self.state_base_model(x) if self.state_base_model else x
-            next_encoded_state = self.hypermodel_forward(hidden_out, split_params)
-            if self.state_prior and self.config.output_prior:
-                # state_prior_params = torch.nn.functional.linear(noise_z, self.state_prior_hyper_model.to(noise_z.device))
-                state_prior_params = self.state_prior_hyper_model(noise_z)
-                split_params = self.split_params(state_prior_params, "state")
-                prior_hidden_out = self.state_prior_base_model(x) if self.state_prior_base_model else hidden_out
-                prior_next_encoded_state = self.hypermodel_forward(prior_hidden_out, split_params)
-                next_encoded_state += prior_next_encoded_state
+            hidden_out, prior_hidden_out = self.state_basedmodel(x) if self.state_basedmodel else (x, None)
+            next_encoded_state, state_params = self.state_hypermodel(noise_z, hidden_out, prior_hidden_out)
         else:
-            next_encoded_state = self.dynamics_encoded_state_network(x)
+            next_encoded_state, _ = self.dynamics_encoded_state_network(x)
             state_params = None
 
         if self.reward_hyper:
-            reward_params = self.reward_hyper_model(noise_z)
-            if self.reward_prior and not self.config.output_prior:
-                # reward_prior_params = torch.nn.functional.linear(noise_z, self.reward_prior_hyper_model.to(noise_z.device))
-                reward_prior_params = self.reward_prior_hyper_model(noise_z)
-                reward_params_ = reward_params + reward_prior_params
-            else:
-                reward_params_ = reward_params
-            split_params = self.split_params(reward_params_, "reward")
-            if self.reward_normal:
-                if len(self.init_norm['reward']) == 0:
-                    self.gen_norm(split_params, "reward")
-                split_params = self.gen_normal_params(split_params, "reward")
-            hidden_out = self.reward_base_model(next_encoded_state) if self.reward_base_model else next_encoded_state
-            reward = self.hypermodel_forward(hidden_out, split_params)
-            if self.reward_prior and self.config.output_prior:
-                # reward_prior_params = torch.nn.functional.linear(noise_z, self.reward_prior_hyper_model.to(noise_z.device))
-                reward_prior_params = self.reward_prior_hyper_model(noise_z)
-                split_params = self.split_params(reward_prior_params, "reward")
-                prior_hidden_out = self.reward_prior_base_model(next_encoded_state) if self.reward_prior_base_model else hidden_out
-                prior_reward = self.hypermodel_forward(prior_hidden_out, split_params)
-                reward += prior_reward
+            hidden_out, prior_hidden_out = self.reward_basedmodel(next_encoded_state) if self.reward_basedmodel else (next_encoded_state, None)
+            reward, reward_params = self.reward_hypermodel(noise_z, hidden_out, prior_hidden_out)
         else:
-            reward = self.dynamics_reward_network(next_encoded_state)
+            reward, _ = self.dynamics_reward_network(next_encoded_state)
             reward_params = None
 
         # Scale encoded state between [0, 1] (See paper appendix Training)
@@ -269,14 +165,6 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         ) / scale_next_encoded_state
 
         return next_encoded_state_normalized, reward, state_params, reward_params
-
-    def hypermodel_forward(self, inputs, params):
-        inputs = inputs.unsqueeze(dim=1)
-        for i in range(0, len(params), 2):
-            inputs = torch.bmm(inputs, params[i]) + params[i+1]
-            if i != len(params) - 2:
-                inputs = torch.nn.functional.relu(inputs)
-        return inputs.squeeze(dim=1)
 
     def initial_inference(self, observation, noise_z):
         if not self.config.use_representation and self.config.stacked_observations == 0:
@@ -302,44 +190,14 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         policy_logits, value, value_params = self.prediction(next_encoded_state, noise_z)
         return value, reward, policy_logits, next_encoded_state, value_params, state_params, reward_params
 
-    def split_params(self, params, hyper_type):
-        shapes, sizes = self.splited_shapes[hyper_type], self.splited_sizes[hyper_type]
-        params = params.split(sizes, dim=1)
-        params_splited = []
-        for param, shape in zip(params, shapes):
-            params_splited.append(param.reshape((-1,) + shape))
-        return params_splited
-
-    def gen_normal_params(self, params, normal_type):
-        init_norm = self.init_norm[normal_type]
-        target_norm = self.target_norm[normal_type]
-        gain = 1.
-        for i, param in enumerate(params):
-            if param.shape[1] == 1:
-                continue
-            param *= gain * target_norm[i // 2] / init_norm[i // 2]
-        return params
-
-    def gen_norm(self, params, norm_type):
-        print(f"gen {norm_type} norm!")
-        init_norm, target_norm = [], []
-        for param in params:
-            if param.shape[1] == 1:
-                continue
-            init_norm.append(torch.norm(param).detach().numpy())
-            target_norm.append(torch.norm(torch.nn.init.xavier_normal_(
-                torch.empty(size=param.size()))).detach().numpy())
-        self.init_norm[norm_type] = init_norm
-        self.target_norm[norm_type] = target_norm
-
     def get_hypermodel_std(self,):
         hypermodel_std = dict()
         hypermodel_std["value_params.weight"] = \
-            self.calculation_std(self.value_hyper_model.weight) if self.value_hyper else 0
+            self.calculation_std(self.value_hypermodel.hypermodel.weight) if self.value_hyper else 0
         hypermodel_std["reward_params.weight"] = \
-            self.calculation_std(self.reward_hyper_model.weight) if self.reward_hyper else 0
+            self.calculation_std(self.reward_hypermodel.hypermodel.weight) if self.reward_hyper else 0
         hypermodel_std["state_params.weight"] = \
-            self.calculation_std(self.state_hyper_model.weight) if self.state_hyper else 0
+            self.calculation_std(self.state_hypermodel.hypermodel.weight) if self.state_hyper else 0
         return hypermodel_std
 
     def calculation_std(self, params):
@@ -347,10 +205,41 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         return std.detach().numpy()
 
     def debug(self, noise_z):
-        value_params = self.value_hyper_model(noise_z).t() if self.value_hyper else None
-        state_params = self.state_hyper_model(noise_z).t() if self.state_hyper else None
-        reward_params = self.reward_hyper_model(noise_z).t() if self.reward_hyper else None
-        return {"value_params": value_params, "reward_params": reward_params, "state_params": state_params, }
+        value_params = self.value_hypermodel.gen_params(noise_z).t() if self.value_hyper else None
+        state_params = self.state_hypermodel.gen_params(noise_z).t() if self.state_hyper else None
+        reward_params = self.reward_hypermodel.gen_params(noise_z).t() if self.reward_hyper else None
+        return {"value_params": value_params, "reward_params": reward_params, "state_params": state_params,}
+
+
+class LinearBasedNet(torch.nn.Module):
+    def __init__(
+        self,
+        layers,
+        bias=True,
+        prior=False,
+        output_activation=torch.nn.Identity,
+        activation=torch.nn.ELU
+    ) -> None:
+        super().__init__()
+        assert len(layers) > 0
+
+        self.prior = prior
+        based_layers, prior_layers = [], []
+        for i in range(len(layers) - 1):
+            act = activation if i < len(layers) - 2 else output_activation
+            based_layers += [torch.nn.Linear(layers[i], layers[i + 1], bias=bias), act()]
+            if self.prior:
+                prior_layers += [torch.nn.Linear(layers[i], layers[i + 1], bias=bias), act()]
+        self.basedmodel =  torch.nn.Sequential(*based_layers)
+        if self.prior:
+            self.priormodel = torch.nn.Sequential(*prior_layers)
+            for param in self.priormodel.parameters():
+                param.requires_grad = False
+
+    def forward(self, x):
+        out = self.basedmodel(x)
+        prior_out = self.priormodel(x) if self.prior else None
+        return out, prior_out
 
 
 class LinearPriorNet(torch.nn.Module):
@@ -398,5 +287,66 @@ class LinearPriorNet(torch.nn.Module):
 
     def extra_repr(self):
         return 'in_features={}, out_features={}, bias={}'.format(
-            self.in_features, self.out_features, not numpy.all(self.bias.numpy() == 0)
+            self.in_features, self.out_features, not self.bias.sum() == 0
         )
+
+
+class LinearHyperNet(torch.nn.Module):
+    def __init__(
+        self,
+        noise_dim: int,
+        layers: list or tuple,
+        prior: bool = True,
+        prior_mean: float or numpy.ndarray = 0.,
+        prior_std: float or numpy.ndarray = 1.,
+    ):
+        super().__init__()
+
+        self.prior = prior
+        self.splited_shapes, self.splited_sizes = self.gen_shape_size(layers)
+        self.in_features = noise_dim
+        self.out_features = sum(self.splited_sizes)
+        self.hypermodel = torch.nn.Linear(self.in_features, self.out_features)
+        if self.prior:
+            self.priormodel = LinearPriorNet(self.in_features, self.out_features, prior_mean, prior_std)
+
+    def gen_shape_size(self, layers):
+        shapes, sizes = [], []
+        for i in range(len(layers)-1):
+            shapes.extend([(layers[i], layers[i+1]), (1, layers[i+1])])
+            sizes.extend([layers[i] * layers[i+1], layers[i+1]])
+        return shapes, sizes
+
+    def split_params(self, params):
+        shapes, sizes = self.splited_shapes, self.splited_sizes
+        params = params.split(sizes, dim=1)
+        params_splited = []
+        for param, shape in zip(params, shapes):
+            params_splited.append(param.reshape((-1,) + shape))
+        return params_splited
+
+    def base_forward(self, x, params):
+        splited_params = self.split_params(params)
+        x = x.unsqueeze(dim=1)
+        for i in range(0, len(splited_params), 2):
+            x = torch.bmm(x, splited_params[i]) + splited_params[i+1]
+            if i != len(splited_params) - 2:
+                x = torch.nn.functional.relu(x)
+        return x.squeeze(dim=1)
+
+    def forward(self, z, x, prior_x=None):
+        params = self.hypermodel(z)
+        out = self.base_forward(x, params)
+        if prior_x is not None and self.prior:
+            prior_params = self.priormodel(z)
+            prior_out = self.base_forward(prior_x, prior_params)
+            out += prior_out
+        return out, params
+
+    def regularization(self, z, p=2):
+        params = self.hypermodel(z)
+        reg_loss = torch.norm(params, dim=1, p=p).square()
+        return reg_loss.mean()
+
+    def gen_params(self, z):
+        return self.hypermodel(z)
