@@ -24,7 +24,7 @@ class Trainer:
             # print(f"update target model")
             self.target_model.load_state_dict(self.model.state_dict())
         self.model.train()
-        self.update_lr(training_step)
+        # self.update_lr(training_step)
         priorities, losses = self.update_weights(batch, played_steps)
         return priorities, losses
 

@@ -375,22 +375,20 @@ class Actor:
 
     def initial_optimizer(self, model):
         trainable_params = [
-            {'params': (p for name, p in model.named_parameters() if 'prior' not in name and 'hyper' not in name)},
+            {'params': (p for name, p in model.named_parameters() if 'prior' not in name and 'hyper' not in name), 'weight_decay': self.config.base_weight_decay},
             {'params': (p for name, p in model.named_parameters() if 'prior' not in name and 'hyper' in name), 'weight_decay': self.config.hyper_weight_decay}
         ]
         # Initialize the optimizer
         if self.config.optimizer == "SGD":
             optimizer = torch.optim.SGD(
                 trainable_params,
-                lr=self.config.lr_init,
+                lr=self.config.lr,
                 momentum=self.config.momentum,
-                weight_decay=self.config.base_weight_decay,
             )
         elif self.config.optimizer == "Adam":
             optimizer = torch.optim.Adam(
                 trainable_params,
-                lr=self.config.lr_init,
-                weight_decay=self.config.base_weight_decay,
+                lr=self.config.lr,
             )
         else:
             raise NotImplementedError(

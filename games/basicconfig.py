@@ -10,7 +10,7 @@ class BasicConfig():
         self.use_priormodel = True
         self.use_normalization = False
         self.use_target_noise = False
-        self.use_reg_loss = False
+        self.use_reg_loss = True
         self.use_value_target_noise = False
         self.use_last_layer = True
         self.use_prior_basemodel = True
@@ -89,6 +89,7 @@ class BasicConfig():
         self.lr_init = 0.02  # Initial learning rate
         self.lr_decay_rate = 0.9  # Set it to 1 to use a constant learning rate
         self.lr_decay_steps = 1000
+        self.lr = 1e-4
 
         ### Replay Buffer
         self.replay_buffer_size = int(1e6)  # Number of self-play games to keep in the replay buffer
