@@ -17,21 +17,21 @@ class BasicConfig():
         self.output_prior = True
         
         # Based Config
-        self.reg_loss_scale = 0.1
-        self.prior_model_std = 1
+        self.reg_loss_scale = 0.01
+        self.prior_model_std = 4
         self.normal_noise_std = 1
         self.target_noise_std = 0.1
-        self.hyper_inp_dim = 32
+        self.hyper_inp_dim = 2
         self.num_simulations = 50
         self.reanalyse_num_simulations = 10
         self.target_update_freq = 100
         self.num_unroll_steps = 10
         self.td_steps = 5
-        self.train_frequency = 100
-        self.train_proportion = 3
+        self.train_frequency = 50
+        self.train_proportion = 1
         self.start_train = 1
         self.train_mode = 2
-        self.total_episode = 1000
+        self.total_episode = 20000
         self.seed = 0
 
         ### Game

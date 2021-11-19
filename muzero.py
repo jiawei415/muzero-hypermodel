@@ -80,6 +80,7 @@ class MuZero:
         # if self.config.use_normalization: self.config.normalization = copy.deepcopy(self.config.hypermodel)
         if self.config.use_target_noise: self.config.target_noise = copy.deepcopy(self.config.hypermodel)
         if self.config.use_value_target_noise: self.config.target_noise[0] = 1
+        if self.config.use_reg_loss: self.config.hyper_weight_decay = 0.
         if game_name == "deepsea": self.config.observation_shape = (1, 1, self.config.size**2)
         log_path = f"results/{game_name}_{self.config.seed}"
         self.config.game_filename = game_name
