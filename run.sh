@@ -34,8 +34,7 @@ if [ "$cmd" = 'run' ]; then
     # <<< conda initialize <<<
     conda activate torch
     
-    python /home/jiawei/Code/tx-muzero-hypermodel/muzero.py --game $task --config $config > log.out 2> log.err &
-    # nohup python /home/jiawei/Code/tx-muzero-hypermodel/muzero.py $task > log.out 2> log.err &
+    python /data/jiawei/Code/muzero-hypermodel/muzero.py --game $task --config $config > log.out 2> log.err &
     # echo "run $task"
 fi
 

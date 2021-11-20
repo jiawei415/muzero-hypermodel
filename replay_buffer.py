@@ -90,7 +90,7 @@ class ReplayBuffer:
         interval = int(self.config.batch_size / self.config.num_process)
 
         if self.config.use_multiprocess:
-            pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
+            pool = multiprocessing.Pool(processes=self.config.num_process)
             torch.set_num_threads(1)
             for i in range(0, self.config.batch_size, interval):
                 results.append(pool.apply_async(func=self.multi_reanalyse, args=(n_games[i:i+interval],)))

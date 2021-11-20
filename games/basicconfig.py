@@ -100,7 +100,7 @@ class BasicConfig():
         self.use_reanalyse = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
         self.all_reanalyse = False
         self.use_multiprocess = True
-        self.num_process = 32
+        self.num_process = 16
 
     def visit_softmax_temperature_fn(self, trained_steps):
         """

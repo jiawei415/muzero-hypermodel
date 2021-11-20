@@ -11,16 +11,14 @@ class MuZeroConfig(BasicConfig):
     def __init__(self):
         super(MuZeroConfig, self).__init__()
         ### Game
-        self.size = 20
+        self.size = 10
         self.deterministic = True
         self.use_move_cost = True
         self.randomize_actions = True
         self.unscaled_move_cost = 0.01
         self.observation_shape = (1, 1, self.size**2)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
         self.action_space = list(range(2))  # Fixed list of all possible actions. You should only edit the length
-        
         self.use_reward_wrapper = True
-        self.train_proportion = 1.5
 
 class Game(AbstractGame):
     """
